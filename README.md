@@ -25,7 +25,7 @@ Every streamer knows the pain:
 ### Installation
 
 1. **Download the installer**
-   - [📥 Download StreamVoice-Installer.bat](https://github.com/yourusername/streamvoice/releases/latest/download/install-windows.bat)
+   - [📥 Download StreamVoice-Installer.bat](https://github.com/guycochran/streamvoice/releases/latest/download/install-windows.bat)
 
 2. **Run the installer**
    - Double-click `install-windows.bat`
@@ -74,7 +74,7 @@ If the installer doesn't work:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/streamvoice.git
+git clone https://github.com/guycochran/streamvoice.git
 cd streamvoice
 
 # Install server dependencies

@@ -37,7 +37,7 @@ cd /d "%INSTALL_DIR%"
 
 :: Download StreamVoice
 echo Downloading StreamVoice...
-curl -L https://github.com/yourusername/streamvoice/archive/main.zip -o streamvoice.zip
+curl -L https://github.com/guycochran/streamvoice/archive/main.zip -o streamvoice.zip
 if %errorlevel% neq 0 (
     echo [ERROR] Download failed!
     pause
