@@ -1,10 +1,12 @@
-// StreamVoice - Voice Control for OBS
+// StreamVoice v0.2 - Voice Control for OBS with WebSocket Support
 class StreamVoice {
     constructor() {
         this.ws = null;
         this.recognition = null;
         this.isConnected = false;
         this.isListening = false;
+        this.obsConnected = false;
+        this.obsScenes = [];
 
         // DOM elements
         this.voiceButton = document.getElementById('voice-button');
@@ -33,12 +35,6 @@ class StreamVoice {
             this.updateConnectionStatus(true);
             this.voiceButton.disabled = false;
             console.log('Connected to StreamVoice server');
-
-            // Force update the UI to show connected status
-            setTimeout(() => {
-                this.updateConnectionStatus(true);
-                console.log('Connection status verified: CONNECTED');
-            }, 100);
         };
 
         this.ws.onmessage = (event) => {
@@ -48,6 +44,7 @@ class StreamVoice {
 
         this.ws.onclose = () => {
             this.isConnected = false;
+            this.obsConnected = false;
             this.updateConnectionStatus(false);
             this.voiceButton.disabled = true;
             console.log('Disconnected from server');
@@ -59,10 +56,6 @@ class StreamVoice {
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
             this.updateConnectionStatus(false);
-
-            // Show more detailed error info
-            console.error('Connection failed to ws://localhost:8090');
-            console.error('Make sure the server is running: npm start');
         };
     }
 
@@ -188,18 +181,40 @@ class StreamVoice {
         switch (message.type) {
             case 'connected':
                 console.log('Server ready with', message.commands, 'commands');
+                this.obsConnected = message.obsConnected;
+                this.obsScenes = message.obsScenes || [];
+                this.updateOBSStatus();
+                break;
+
+            case 'obs_connected':
+                this.obsConnected = true;
+                this.obsScenes = message.scenes || [];
+                this.updateOBSStatus();
+                this.showNotification('✅ OBS Connected!', 'success');
+                break;
+
+            case 'obs_disconnected':
+                this.obsConnected = false;
+                this.updateOBSStatus();
+                this.showNotification('❌ OBS Disconnected', 'error');
+                break;
+
+            case 'scene_changed':
+                this.showNotification(`📺 Scene: ${message.sceneName}`, 'info');
                 break;
 
             case 'command_recognized':
-                this.result.textContent = '✓ Command recognized';
+                this.result.textContent = `✓ Recognized: "${message.command}"`;
                 this.result.className = 'result success';
                 this.playSound('success');
                 break;
 
             case 'command_executed':
-                this.addToHistory(this.transcript.textContent, true);
-                this.result.textContent = '✓ Command executed successfully';
-                this.result.className = 'result success';
+                this.addToHistory(this.transcript.textContent, message.success);
+                this.result.textContent = message.success
+                    ? `✓ ${message.message}`
+                    : `✗ ${message.message}`;
+                this.result.className = message.success ? 'result success' : 'result error';
                 break;
 
             case 'command_failed':
@@ -222,6 +237,8 @@ class StreamVoice {
 
     updateConnectionStatus(connected) {
         const statusEl = this.connectionStatus;
+        const detailsEl = document.getElementById('connection-details');
+
         if (connected) {
             statusEl.className = 'status connected';
             statusEl.querySelector('.status-text').textContent = 'Connected';
@@ -229,6 +246,50 @@ class StreamVoice {
             statusEl.className = 'status disconnected';
             statusEl.querySelector('.status-text').textContent = 'Disconnected';
         }
+
+        // Update details
+        if (detailsEl) {
+            if (connected) {
+                detailsEl.textContent = this.obsConnected
+                    ? `✅ OBS Connected (${this.obsScenes.length} scenes)`
+                    : '⚠️ OBS not detected - Install WebSocket plugin';
+            } else {
+                detailsEl.textContent = 'WebSocket: ws://localhost:8090';
+            }
+        }
+    }
+
+    updateOBSStatus() {
+        const detailsEl = document.getElementById('connection-details');
+        if (detailsEl && this.isConnected) {
+            detailsEl.textContent = this.obsConnected
+                ? `✅ OBS Connected (${this.obsScenes.length} scenes)`
+                : '⚠️ OBS not detected - Install WebSocket plugin';
+        }
+    }
+
+    showNotification(text, type) {
+        // Create a temporary notification
+        const notif = document.createElement('div');
+        notif.className = `notification ${type}`;
+        notif.textContent = text;
+        notif.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: ${type === 'success' ? '#2ecc71' : type === 'error' ? '#e74c3c' : '#3498db'};
+            color: white;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        `;
+        document.body.appendChild(notif);
+
+        setTimeout(() => {
+            notif.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notif.remove(), 300);
+        }, 3000);
     }
 
     addToHistory(command, success) {
@@ -265,6 +326,24 @@ class StreamVoice {
             const commandsList = document.getElementById('commands-list');
             commandsList.innerHTML = '';
 
+            // Add OBS status at top
+            if (data.obsConnected && data.scenes) {
+                const obsStatus = document.createElement('div');
+                obsStatus.className = 'obs-status';
+                obsStatus.innerHTML = `
+                    <h4>✅ OBS Connected</h4>
+                    <p>Available scenes: ${data.scenes.join(', ')}</p>
+                `;
+                obsStatus.style.cssText = `
+                    background: #2ecc71;
+                    color: white;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                `;
+                commandsList.appendChild(obsStatus);
+            }
+
             for (const [category, cmds] of Object.entries(categories)) {
                 if (cmds.length === 0) continue;
 
@@ -287,33 +366,49 @@ class StreamVoice {
     }
 
     playSound(type) {
-        // In production, we'd play actual sound files
-        // For now, we'll use the Web Audio API for simple beeps
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
 
-        gainNode.gain.value = 0.1;
+            gainNode.gain.value = 0.1;
 
-        switch (type) {
-            case 'start':
-                oscillator.frequency.value = 800;
-                break;
-            case 'success':
-                oscillator.frequency.value = 1200;
-                break;
-            case 'error':
-                oscillator.frequency.value = 400;
-                break;
+            switch (type) {
+                case 'start':
+                    oscillator.frequency.value = 800;
+                    break;
+                case 'success':
+                    oscillator.frequency.value = 1200;
+                    break;
+                case 'error':
+                    oscillator.frequency.value = 400;
+                    break;
+            }
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            console.log('Audio playback failed:', e);
         }
-
-        oscillator.start();
-        oscillator.stop(audioContext.currentTime + 0.1);
     }
 }
+
+// Add notification animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
 
 // Initialize StreamVoice when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

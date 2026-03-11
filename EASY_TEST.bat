@@ -9,7 +9,7 @@ echo ========================================
 echo.
 
 :: Check if we're in the right folder
-if not exist "server\index-new.js" (
+if not exist "server\index.js" (
     echo [ERROR] Please run this file from the StreamVoice folder!
     echo.
     echo Download StreamVoice.zip and extract it first.

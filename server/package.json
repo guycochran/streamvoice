@@ -2,11 +2,10 @@
   "name": "streamvoice-server",
   "version": "0.2.0",
   "description": "Voice control server for OBS Studio with real WebSocket support",
-  "main": "index-new.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node index-new.js",
-    "start-legacy": "node index.js",
-    "dev": "nodemon index-new.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
     "child_process": "^1.0.2",
