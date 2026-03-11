@@ -20,7 +20,7 @@ Every streamer knows the pain:
 - Windows 10 or later
 - [Node.js](https://nodejs.org/) (LTS version)
 - Chrome browser (for voice recognition)
-- OBS Studio with [CLI-Anything](https://github.com/HKUDS/CLI-Anything)
+- OBS Studio (see [OBS Setup Guide](OBS_SETUP_GUIDE.md) for details)
 
 ### Installation
 
@@ -120,6 +120,12 @@ python -m http.server 8888
 
 We're looking for 10 streamers to test StreamVoice!
 
+**Current Status:** This is a proof-of-concept showing voice control is possible. Not all OBS commands work yet (see [OBS Setup Guide](OBS_SETUP_GUIDE.md)), but you can test:
+- ✅ Voice recognition accuracy
+- ✅ UI/UX while gaming
+- ✅ Connection reliability
+- ✅ Overall concept validation
+
 **What you get:**
 - ✅ Free access to all features
 - ✅ Direct support from the developer
@@ -127,7 +133,7 @@ We're looking for 10 streamers to test StreamVoice!
 - ✅ Credit as a founding user
 
 **What we need:**
-- 📊 Feedback on what works/doesn't work
+- 📊 Feedback on the voice control experience
 - 💡 Ideas for new commands
 - 🐛 Bug reports
 - 📹 A clip of you using it on stream (optional)
