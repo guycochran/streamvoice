@@ -2,7 +2,11 @@
 
 Never alt-tab out of your game again! Control OBS Studio with simple voice commands.
 
-![StreamVoice Demo](https://img.shields.io/badge/status-beta-yellow) ![Platform](https://img.shields.io/badge/platform-windows-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![StreamVoice Demo](https://img.shields.io/badge/version-v0.2.0-brightgreen) ![Status](https://img.shields.io/badge/status-working!-success) ![Platform](https://img.shields.io/badge/platform-windows-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+
+## 🎉 v0.2.0 UPDATE: IT ACTUALLY CONTROLS OBS NOW!
+
+**StreamVoice now uses OBS WebSocket for REAL control!** Scene switching, recording, streaming - it all works!
 
 ## 🎮 Why StreamVoice?
 
@@ -20,7 +24,7 @@ Every streamer knows the pain:
 - Windows 10 or later
 - [Node.js](https://nodejs.org/) (LTS version)
 - Chrome browser (for voice recognition)
-- OBS Studio (see [OBS Setup Guide](OBS_SETUP_GUIDE.md) for details)
+- OBS Studio v28+ (WebSocket built-in!) - See [Setup Guide](OBS_WEBSOCKET_SETUP.md)
 
 ### Installation
 
@@ -120,11 +124,12 @@ python -m http.server 8888
 
 We're looking for 10 streamers to test StreamVoice!
 
-**Current Status:** This is a proof-of-concept showing voice control is possible. Not all OBS commands work yet (see [OBS Setup Guide](OBS_SETUP_GUIDE.md)), but you can test:
-- ✅ Voice recognition accuracy
-- ✅ UI/UX while gaming
-- ✅ Connection reliability
-- ✅ Overall concept validation
+**v0.2.0 Status:** FULLY WORKING with OBS WebSocket!
+- ✅ Scene switching works instantly
+- ✅ Recording start/stop works
+- ✅ Streaming control works
+- ✅ Audio mute/unmute works
+- ✅ Real-time OBS feedback
 
 **What you get:**
 - ✅ Free access to all features
