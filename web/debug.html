@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice Debug</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #0a0a0a;
+            color: #fff;
+            padding: 20px;
+        }
+        #status {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        #log {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-left: 3px solid #666;
+        }
+        .log-entry.error {
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+        .log-entry.success {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.1);
+        }
+        .log-entry.info {
+            border-color: #3498db;
+            background: rgba(52, 152, 219, 0.1);
+        }
+        button {
+            background: #9b59b6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+        }
+        button:hover {
+            background: #8e44ad;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>StreamVoice Connection Debug</h1>
+    <div id="status">Status: Unknown</div>
+
+    <button onclick="testConnection()">Test WebSocket Connection</button>
+    <button onclick="checkPorts()">Check All Ports</button>
+    <button onclick="clearLog()">Clear Log</button>
+    <button onclick="testREST()">Test REST API</button>
+
+    <div id="log"></div>
+
+    <script>
+        const log = (message, type = 'info') => {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="timestamp">${timestamp}</span> - ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        const updateStatus = (status, connected) => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = `Status: ${status}`;
+            statusDiv.style.color = connected ? '#2ecc71' : '#e74c3c';
+        };
+
+        const testConnection = () => {
+            log('Starting WebSocket connection test...', 'info');
+
+            const ws = new WebSocket('ws://localhost:8090');
+
+            ws.onopen = () => {
+                log('✅ WebSocket connected successfully!', 'success');
+                updateStatus('Connected', true);
+
+                // Test sending a message
+                const testMessage = {
+                    type: 'voice_command',
+                    text: 'test connection'
+                };
+                ws.send(JSON.stringify(testMessage));
+                log('Sent test message: ' + JSON.stringify(testMessage), 'info');
+            };
+
+            ws.onmessage = (event) => {
+                log('📨 Received message: ' + event.data, 'success');
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'connected') {
+                        log(`✅ Server ready with ${message.commands} commands available`, 'success');
+                    }
+                } catch (e) {
+                    log('Failed to parse message: ' + e.message, 'error');
+                }
+            };
+
+            ws.onerror = (error) => {
+                log('❌ WebSocket error: ' + error, 'error');
+                updateStatus('Error', false);
+
+                // Provide troubleshooting tips
+                log('Troubleshooting tips:', 'info');
+                log('1. Check if server is running: npm start in server directory', 'info');
+                log('2. Verify port 8090 is not blocked by firewall', 'info');
+                log('3. Try refreshing the page (Ctrl+Shift+R)', 'info');
+                log('4. Check browser console for additional errors (F12)', 'info');
+            };
+
+            ws.onclose = (event) => {
+                log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`, 'info');
+                updateStatus('Disconnected', false);
+
+                if (event.code === 1006) {
+                    log('❌ Connection refused - server might not be running', 'error');
+                }
+            };
+        };
+
+        const checkPorts = async () => {
+            log('Checking common ports...', 'info');
+
+            const ports = [8090, 8080, 3030, 3000, 8000, 8888];
+
+            for (const port of ports) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                    const wsTest = new WebSocket(`ws://localhost:${port}`);
+
+                    await new Promise((resolve, reject) => {
+                        wsTest.onopen = () => {
+                            log(`✅ Port ${port}: WebSocket server found`, 'success');
+                            wsTest.close();
+                            clearTimeout(timeoutId);
+                            resolve();
+                        };
+
+                        wsTest.onerror = () => {
+                            log(`❌ Port ${port}: No WebSocket server`, 'error');
+                            clearTimeout(timeoutId);
+                            resolve();
+                        };
+
+                        setTimeout(resolve, 1500);
+                    });
+                } catch (e) {
+                    log(`Port ${port}: ${e.message}`, 'error');
+                }
+            }
+        };
+
+        const testREST = async () => {
+            log('Testing REST API endpoints...', 'info');
+
+            try {
+                // Test health endpoint
+                const healthResponse = await fetch('http://localhost:3030/health');
+                if (healthResponse.ok) {
+                    const health = await healthResponse.json();
+                    log('✅ REST API Health: ' + JSON.stringify(health), 'success');
+                } else {
+                    log('❌ REST API Health check failed: ' + healthResponse.status, 'error');
+                }
+
+                // Test commands endpoint
+                const commandsResponse = await fetch('http://localhost:3030/commands');
+                if (commandsResponse.ok) {
+                    const data = await commandsResponse.json();
+                    log(`✅ Available commands: ${data.commands.length}`, 'success');
+                    log('Commands: ' + data.commands.slice(0, 5).join(', ') + '...', 'info');
+                } else {
+                    log('❌ Commands endpoint failed: ' + commandsResponse.status, 'error');
+                }
+            } catch (e) {
+                log('❌ REST API Error: ' + e.message, 'error');
+                log('Make sure the server is running on port 3030', 'info');
+            }
+        };
+
+        const clearLog = () => {
+            document.getElementById('log').innerHTML = '';
+            log('Log cleared', 'info');
+        };
+
+        // Auto-test on load
+        window.onload = () => {
+            log('StreamVoice Debug Tool Loaded', 'info');
+            log('Browser: ' + navigator.userAgent, 'info');
+
+            // Check if Chrome
+            if (!window.chrome) {
+                log('⚠️ Warning: You might not be using Chrome. Voice recognition requires Chrome.', 'error');
+            }
+
+            // Auto-test connection
+            setTimeout(testConnection, 500);
+        };
+    </script>
+</body>
+</html>

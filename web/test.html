@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice Quick Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .status {
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .connected {
+            background: #4CAF50;
+            color: white;
+        }
+        .disconnected {
+            background: #f44336;
+            color: white;
+        }
+        .instructions {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎙️ StreamVoice Connection Test</h1>
+
+    <div id="status" class="status disconnected">
+        Checking connection...
+    </div>
+
+    <div class="instructions">
+        <h2>Quick Start Guide</h2>
+
+        <h3>1. Make sure the server is running:</h3>
+        <pre>cd ~/skunkworks-production-agents/streamvoice/server
+npm start</pre>
+
+        <h3>2. Access StreamVoice:</h3>
+        <ul>
+            <li><a href="http://localhost:8888/index.html" target="_blank">Open StreamVoice Main Interface</a></li>
+            <li><a href="http://localhost:8888/debug.html" target="_blank">Open Debug Tool</a></li>
+        </ul>
+
+        <h3>3. What you should see:</h3>
+        <ul>
+            <li>✅ Green "Connected" status at the top</li>
+            <li>✅ Voice button is enabled (not grayed out)</li>
+            <li>✅ WebSocket connection on port 8090</li>
+            <li>✅ REST API on port 3030</li>
+        </ul>
+
+        <h3>4. Test a command:</h3>
+        <ol>
+            <li>Click and hold the microphone button</li>
+            <li>Say "Switch to gameplay"</li>
+            <li>Release the button</li>
+            <li>You should see the command recognized</li>
+        </ol>
+
+        <h3>5. If you're seeing "Disconnected":</h3>
+        <ul>
+            <li>Hard refresh: <code>Ctrl+Shift+R</code></li>
+            <li>Clear browser cache</li>
+            <li>Try an incognito/private window</li>
+            <li>Check browser console (<code>F12</code>) for errors</li>
+            <li>Ensure you're using Chrome (required for voice recognition)</li>
+        </ul>
+    </div>
+
+    <div class="instructions">
+        <h2>Connection Details</h2>
+        <p id="details">Testing connections...</p>
+    </div>
+
+    <script>
+        async function testConnections() {
+            const statusEl = document.getElementById('status');
+            const detailsEl = document.getElementById('details');
+            let details = [];
+
+            // Test WebSocket
+            try {
+                const ws = new WebSocket('ws://localhost:8090');
+
+                await new Promise((resolve, reject) => {
+                    ws.onopen = () => {
+                        statusEl.className = 'status connected';
+                        statusEl.textContent = '✅ Connected to StreamVoice!';
+                        details.push('✅ WebSocket: Connected on port 8090');
+                        ws.close();
+                        resolve();
+                    };
+
+                    ws.onerror = (error) => {
+                        statusEl.className = 'status disconnected';
+                        statusEl.textContent = '❌ WebSocket Connection Failed';
+                        details.push('❌ WebSocket: Failed to connect on port 8090');
+                        reject(error);
+                    };
+
+                    setTimeout(() => reject(new Error('Connection timeout')), 3000);
+                });
+            } catch (e) {
+                console.error('WebSocket error:', e);
+            }
+
+            // Test REST API
+            try {
+                const response = await fetch('http://localhost:3030/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    details.push(`✅ REST API: ${data.status} (v${data.version})`);
+                } else {
+                    details.push('❌ REST API: Failed to connect on port 3030');
+                }
+            } catch (e) {
+                details.push('❌ REST API: Not available on port 3030');
+            }
+
+            // Update details
+            detailsEl.innerHTML = details.join('<br>');
+        }
+
+        // Test on load
+        testConnections();
+
+        // Re-test every 5 seconds
+        setInterval(testConnections, 5000);
+    </script>
+</body>
+</html>
