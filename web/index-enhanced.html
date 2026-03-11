@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice Enhanced - Advanced Voice Control for OBS</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#9b59b6">
+    <style>
+        /* Enhanced UI styles */
+        .command-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .category {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .category h4 {
+            color: #9b59b6;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .category-commands {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .command-chip {
+            background: rgba(155, 89, 182, 0.2);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(155, 89, 182, 0.3);
+        }
+
+        .command-chip:hover {
+            background: rgba(155, 89, 182, 0.4);
+            transform: translateX(5px);
+        }
+
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .status-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-item h5 {
+            margin: 0 0 5px 0;
+            color: #9b59b6;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .status-item .value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .macro-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .macro-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .macro-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab.active {
+            color: #9b59b6;
+            border-bottom-color: #9b59b6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .audio-mixer {
+            display: grid;
+            gap: 20px;
+        }
+
+        .audio-channel {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .audio-channel h4 {
+            margin: 0 0 15px 0;
+            color: #9b59b6;
+        }
+
+        .volume-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .mute-button {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mute-button.unmuted {
+            background: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ StreamVoice Enhanced</h1>
+            <p class="tagline">Advanced voice control for OBS Studio</p>
+        </header>
+
+        <main>
+            <div class="status-card">
+                <div id="connection-status" class="status disconnected">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Disconnected</span>
+                </div>
+                <div style="margin-top: 10px; font-size: 12px; color: #666; text-align: center;">
+                    <span id="connection-details">WebSocket: ws://localhost:8090</span>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('voice')">Voice Control</button>
+                <button class="tab" onclick="switchTab('macros')">Stream Deck</button>
+                <button class="tab" onclick="switchTab('commands')">All Commands</button>
+                <button class="tab" onclick="switchTab('audio')">Audio Mixer</button>
+                <button class="tab" onclick="switchTab('status')">OBS Status</button>
+            </div>
+
+            <!-- Voice Control Tab -->
+            <div id="voice-tab" class="tab-content active">
+                <div class="voice-control">
+                    <button id="voice-button" class="voice-button" disabled>
+                        <svg class="mic-icon" viewBox="0 0 24 24" width="48" height="48">
+                            <path fill="currentColor" d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z"/>
+                        </svg>
+                        <span class="button-text">Hold to Speak</span>
+                    </button>
+                    <div id="voice-feedback" class="voice-feedback hidden">
+                        <div class="voice-wave">
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                        <p class="listening-text">Listening...</p>
+                    </div>
+                </div>
+
+                <div class="transcript-area">
+                    <p id="transcript" class="transcript">Press and hold the button to speak</p>
+                    <p id="result" class="result"></p>
+                </div>
+
+                <div class="command-history">
+                    <h3>Recent Commands</h3>
+                    <ul id="history-list" class="history-list">
+                        <!-- Commands will be added here -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Stream Deck Tab -->
+            <div id="macros-tab" class="tab-content">
+                <h3>Stream Deck Macros</h3>
+                <p style="color: #666; margin-bottom: 20px;">One-click actions like a Stream Deck!</p>
+                <div class="macro-buttons">
+                    <button class="macro-button" onclick="executeCommand('stream starting setup')">
+                        🚀 Start Stream
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('stream ending setup')">
+                        🛑 End Stream
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('raid mode')">
+                        🎯 Raid Mode
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('subscriber celebration')">
+                        🎉 Sub Celebration
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('emergency mute')">
+                        🚨 Emergency Mute
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('take screenshot')">
+                        📸 Screenshot
+                    </button>
+                </div>
+            </div>
+
+            <!-- All Commands Tab -->
+            <div id="commands-tab" class="tab-content">
+                <h3>All Voice Commands</h3>
+                <div class="command-categories" id="command-categories">
+                    <!-- Categories will be populated here -->
+                </div>
+            </div>
+
+            <!-- Audio Mixer Tab -->
+            <div id="audio-tab" class="tab-content">
+                <h3>Audio Mixer</h3>
+                <div class="audio-mixer">
+                    <div class="audio-channel">
+                        <h4>🎤 Microphone</h4>
+                        <input type="range" class="volume-slider" id="mic-volume" min="0" max="100" value="75">
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="mute-button unmuted" onclick="toggleMute('mic')">Mute</button>
+                            <button class="quick-cmd" onclick="executeCommand('mic volume fifty percent')">50%</button>
+                        </div>
+                    </div>
+                    <div class="audio-channel">
+                        <h4>🖥️ Desktop Audio</h4>
+                        <input type="range" class="volume-slider" id="desktop-volume" min="0" max="100" value="50">
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="mute-button unmuted" onclick="toggleMute('desktop')">Mute</button>
+                            <button class="quick-cmd" onclick="executeCommand('desktop volume fifty percent')">50%</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OBS Status Tab -->
+            <div id="status-tab" class="tab-content">
+                <h3>OBS Status</h3>
+                <div class="status-panel">
+                    <div class="status-item">
+                        <h5>Current Scene</h5>
+                        <div class="value" id="current-scene">-</div>
+                    </div>
+                    <div class="status-item">
+                        <h5>Recording</h5>
+                        <div class="value" id="recording-status">OFF</div>
+                    </div>
+                    <div class="status-item">
+                        <h5>Streaming</h5>
+                        <div class="value" id="streaming-status">OFF</div>
+                    </div>
+                    <div class="status-item">
+                        <h5>Available Scenes</h5>
+                        <div class="value" id="scene-count">0</div>
+                    </div>
+                </div>
+                <div id="scene-list" style="margin-top: 20px;">
+                    <!-- Scene list will be populated here -->
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>StreamVoice Enhanced v0.3.0 - Advanced OBS Control</p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Execute command directly
+        function executeCommand(command) {
+            if (window.streamVoice && window.streamVoice.ws.readyState === WebSocket.OPEN) {
+                window.streamVoice.ws.send(JSON.stringify({
+                    type: 'voice_command',
+                    text: command
+                }));
+                window.streamVoice.addToHistory(command);
+            } else {
+                alert('Not connected to StreamVoice server!');
+            }
+        }
+
+        // Toggle mute
+        function toggleMute(source) {
+            const button = event.target;
+            const isMuted = button.classList.contains('muted');
+            const command = isMuted ? `unmute my ${source}` : `mute my ${source}`;
+
+            executeCommand(command);
+
+            // Toggle button state
+            button.classList.toggle('muted');
+            button.classList.toggle('unmuted');
+            button.textContent = isMuted ? 'Mute' : 'Unmute';
+        }
+
+        // Load enhanced app.js
+        const script = document.createElement('script');
+        script.src = 'app-enhanced.js';
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
