@@ -41,19 +41,19 @@ fi
 # Release information
 OWNER="guycochran"
 REPO="streamvoice"
-TAG="v0.2.0"
-NAME="StreamVoice v0.2.0 - First Beta Release! 🎉"
+TAG="v0.3.0"
+NAME="StreamVoice v0.3.0 - Stream Deck Alternative! 🎯"
 PRERELEASE=true
-ASSET_PATH="StreamVoice-v0.2.0.tar.gz"
+ASSET_PATH="StreamVoice-v0.3.0.tar.gz"
 
 # Read release notes
-if [ ! -f "RELEASE_NOTES_v0.2.0.md" ]; then
-    echo -e "${RED}❌ Error: RELEASE_NOTES_v0.2.0.md not found!${NC}"
+if [ ! -f "RELEASE_NOTES_v0.3.0.md" ]; then
+    echo -e "${RED}❌ Error: RELEASE_NOTES_v0.3.0.md not found!${NC}"
     exit 1
 fi
 
 # Escape the body content for JSON
-BODY=$(cat RELEASE_NOTES_v0.2.0.md | jq -Rs .)
+BODY=$(cat RELEASE_NOTES_v0.3.0.md | jq -Rs .)
 
 echo "Creating release for tag: $TAG"
 echo ""
@@ -119,4 +119,4 @@ echo "2. Share the release link with beta testers"
 echo "3. Post on social media using the templates in docs/SOCIAL_MEDIA_POSTS.md"
 echo ""
 echo "Beta testers can download from:"
-echo "https://github.com/guycochran/streamvoice/releases/download/v0.2.0/StreamVoice-v0.2.0.tar.gz"
+echo "https://github.com/guycochran/streamvoice/releases/download/v0.3.0/StreamVoice-v0.3.0.tar.gz"

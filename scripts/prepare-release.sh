@@ -3,7 +3,7 @@
 # StreamVoice Release Preparation Script
 # This script creates a ready-to-use zip file for distribution
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 RELEASE_NAME="StreamVoice-v${VERSION}"
 RELEASE_DIR="/tmp/${RELEASE_NAME}"
 
