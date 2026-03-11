@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice - Voice Control for OBS</title>
+    <meta name="description" content="Control OBS Studio with your voice. No more alt-tabbing during streams!">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #0a0a0a;
+            color: #fff;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero p {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: #fff;
+            color: #764ba2;
+            padding: 15px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .feature {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .feature h3 {
+            color: #764ba2;
+            margin-bottom: 10px;
+        }
+
+        .demo-video {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 40px 0;
+            text-align: center;
+            border: 1px solid #333;
+        }
+
+        .demo-video h2 {
+            color: #764ba2;
+            margin-bottom: 20px;
+        }
+
+        .commands {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 40px 0;
+            border: 1px solid #333;
+        }
+
+        .commands h2 {
+            color: #764ba2;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .command-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .command {
+            background: #0a0a0a;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            color: #4ade80;
+            border: 1px solid #333;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid #333;
+            margin-top: 60px;
+        }
+
+        .footer a {
+            color: #764ba2;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 {
+                font-size: 2em;
+            }
+            .hero p {
+                font-size: 1.1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>🎙️ StreamVoice</h1>
+        <p>Control OBS with your voice. No more alt-tabbing!</p>
+        <a href="https://github.com/guycochran/streamvoice/releases/download/v0.2.0/StreamVoice-v0.2.0.tar.gz" class="cta-button">
+            Download Beta v0.2.0
+        </a>
+    </div>
+
+    <div class="container">
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🎤</div>
+                <h3>Voice Control</h3>
+                <p>Hold to talk design for accurate command recognition</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3>Easy Setup</h3>
+                <p>Extract, run INSTALL.bat, then EASY_TEST.bat - done!</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎮</div>
+                <h3>Made for Streamers</h3>
+                <p>20+ commands designed for real streaming workflows</p>
+            </div>
+        </div>
+
+        <div class="commands">
+            <h2>Available Commands</h2>
+            <div class="command-list">
+                <div class="command">"Switch to gameplay"</div>
+                <div class="command">"Start recording"</div>
+                <div class="command">"Mute my mic"</div>
+                <div class="command">"Be right back"</div>
+                <div class="command">"Stop streaming"</div>
+                <div class="command">"Emergency privacy"</div>
+            </div>
+        </div>
+
+        <div class="demo-video">
+            <h2>See It In Action</h2>
+            <p>Demo video coming soon! For now, download and try it yourself.</p>
+            <p style="margin-top: 20px;">
+                <a href="https://github.com/guycochran/streamvoice#-how-to-use" style="color: #764ba2;">
+                    View Setup Instructions →
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Free & Open Source</p>
+        <a href="https://github.com/guycochran/streamvoice">GitHub</a>
+        <a href="https://github.com/guycochran/streamvoice/issues">Report Issues</a>
+        <a href="https://github.com/guycochran/streamvoice/releases">All Releases</a>
+    </div>
+</body>
+</html>

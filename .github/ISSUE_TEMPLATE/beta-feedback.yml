@@ -1,0 +1,91 @@
+name: Beta Feedback
+description: Share your experience testing StreamVoice
+title: "[BETA] "
+labels: ["beta-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing StreamVoice! Your feedback helps make it better for everyone.
+
+  - type: checkboxes
+    attributes:
+      label: Setup Experience
+      description: How was the installation process?
+      options:
+        - label: Installation was smooth
+        - label: EASY_TEST.bat worked perfectly
+        - label: OBS WebSocket setup was clear
+        - label: Connected to OBS successfully
+
+  - type: textarea
+    attributes:
+      label: Commands That Worked
+      description: Which voice commands worked well for you?
+      placeholder: |
+        - "Switch to gameplay" ✓
+        - "Start recording" ✓
+        - "Mute my mic" ✓
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Commands That Didn't Work
+      description: Any commands that failed or were misrecognized?
+      placeholder: |
+        - "Be right back" was recognized as "the right back"
+        - Had to repeat "Stop streaming" twice
+
+  - type: input
+    attributes:
+      label: Your Setup
+      description: Help us understand your environment
+      placeholder: "Windows 11, OBS 30.0.2, Blue Yeti mic"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Your OBS Scenes
+      description: List your scene names (helps us improve matching)
+      placeholder: |
+        - Gameplay
+        - Just Chatting
+        - Starting Soon
+        - BRB Screen
+        - Thanks for Watching
+
+  - type: textarea
+    attributes:
+      label: Feature Requests
+      description: What commands or features would you like to see?
+      placeholder: |
+        - "Switch to camera 2"
+        - "Enable stream overlay"
+        - Visual feedback when command is recognized
+
+  - type: dropdown
+    attributes:
+      label: Overall Experience
+      options:
+        - "🤩 Amazing - This is game changing!"
+        - "😊 Good - Works well with minor issues"
+        - "😐 Okay - Needs improvement"
+        - "😕 Frustrating - Had major problems"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional Comments
+      description: Anything else you'd like to share?
+      placeholder: "My 13-year-old thinks this is the coolest thing ever!"
+
+  - type: checkboxes
+    attributes:
+      label: Beta Tester Info
+      options:
+        - label: I'd like to be credited in the release notes
+        - label: I'm interested in testing future versions
+        - label: I plan to use StreamVoice regularly
