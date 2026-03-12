@@ -1,0 +1,31 @@
+name: Test NPM Install
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Test npm install
+      working-directory: electron-app
+      run: npm install --force
+
+    - name: Test build command exists
+      working-directory: electron-app
+      run: npm run --list
+
+    - name: Try dry run build
+      working-directory: electron-app
+      run: npm run build-win -- --dry-run
