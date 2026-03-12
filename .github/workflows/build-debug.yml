@@ -1,0 +1,47 @@
+name: Build Debug
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Debug - List root
+      run: dir
+
+    - name: Debug - Check electron-app
+      run: |
+        if (Test-Path electron-app) {
+          echo "electron-app directory exists"
+          cd electron-app
+          dir
+        } else {
+          echo "electron-app directory NOT FOUND"
+        }
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Node version
+      run: |
+        node --version
+        npm --version
+
+    - name: Try npm install
+      working-directory: electron-app
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Files in directory:"
+        dir
+        echo "Installing dependencies..."
+        npm install --verbose
