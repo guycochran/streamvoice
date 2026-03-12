@@ -90,6 +90,11 @@ function loadStartupScreen(title, detail) {
     return;
   }
 
+  const backendTail = getBackendLogTailSync();
+  const backendBlock = backendTail
+    ? `<pre>${escapeHtml(backendTail)}</pre>`
+    : '<p>No backend log available yet.</p>';
+
   const html = `<!doctype html>
   <html>
     <head>
@@ -122,12 +127,26 @@ function loadStartupScreen(title, detail) {
           color: #a9b4c2;
           line-height: 1.5;
         }
+        pre {
+          margin: 16px 0 0;
+          padding: 14px;
+          white-space: pre-wrap;
+          word-break: break-word;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.04);
+          color: #d7e0ea;
+          font-size: 12px;
+          line-height: 1.45;
+          max-height: 240px;
+          overflow: auto;
+        }
       </style>
     </head>
     <body>
       <div class="panel">
         <h1>${title}</h1>
         <p>${detail}</p>
+        ${backendBlock}
       </div>
     </body>
   </html>`;
@@ -137,19 +156,23 @@ function loadStartupScreen(title, detail) {
 
 async function loadEnhancedApp(maxAttempts = 30) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      const baseUrl = await resolveServerBaseUrl(true);
-      await mainWindow.loadURL(`${baseUrl}/index-enhanced.html`);
-      mainWindow.show();
-      checkForUpdates();
-      return;
-    } catch (error) {
-      loadStartupScreen(
-        'Starting StreamVoice...',
-        `Waiting for local services (${attempt}/${maxAttempts}). ${error.message}`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    for (const baseUrl of SERVER_BASE_URL_CANDIDATES) {
+      try {
+        await mainWindow.loadURL(`${baseUrl}/index-enhanced.html`);
+        resolvedServerBaseUrl = baseUrl;
+        mainWindow.show();
+        checkForUpdates();
+        return;
+      } catch (error) {
+        // Try the next candidate.
+      }
     }
+
+    loadStartupScreen(
+      'Starting StreamVoice...',
+      `Waiting for local services (${attempt}/${maxAttempts}).`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
   loadStartupScreen(
@@ -157,6 +180,23 @@ async function loadEnhancedApp(maxAttempts = 30) {
     'The local backend did not become reachable. Restart the app and check the packaged backend log.'
   );
   mainWindow.show();
+}
+
+function getBackendLogTailSync() {
+  if (!backendLogFilePath || !fs.existsSync(backendLogFilePath)) {
+    return '';
+  }
+
+  const content = fs.readFileSync(backendLogFilePath, 'utf8');
+  const lines = content.trim().split('\n').filter(Boolean);
+  return lines.slice(-12).join('\n');
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 function createTray() {
@@ -194,7 +234,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.17',
+          message: 'StreamVoice v1.0.18',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
