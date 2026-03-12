@@ -18,27 +18,10 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-
-    - name: Install Python dependencies
-      run: pip install Pillow
-
     - name: Install dependencies
       working-directory: electron-app
       run: |
         npm ci --force || npm install --force
-        npm install electron-builder --save-dev --force
-
-    - name: Check for icons
-      working-directory: electron-app
-      run: |
-        if (!(Test-Path assets/icon.png)) {
-          echo "Creating placeholder icon..."
-          Copy-Item assets/icon.svg assets/icon.png 2>$null || echo "Icon exists"
-        }
 
     - name: Build Windows installer
       working-directory: electron-app
