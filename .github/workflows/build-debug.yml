@@ -10,9 +10,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@v4
       with:
         node-version: '20'
 
@@ -23,18 +23,12 @@ jobs:
         echo "=== Current directory structure ==="
         dir
 
-        echo "`n=== Remove problematic directories ==="
-        if (Test-Path server) { Remove-Item -Recurse -Force server }
-        if (Test-Path web) { Remove-Item -Recurse -Force web }
-        if (Test-Path scripts) { Remove-Item -Recurse -Force scripts }
-        if (Test-Path renderer) { Remove-Item -Recurse -Force renderer }
-
         echo "`n=== Clean install ==="
         if (Test-Path package-lock.json) { Remove-Item package-lock.json }
         if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
         npm install
 
-        echo "`n=== Try build with minimal files ==="
+        echo "`n=== Try unpacked build with current project structure ==="
         npx electron-builder --win --dir
 
         echo "`n=== Check output ==="
@@ -46,7 +40,7 @@ jobs:
         }
 
     - name: Upload anything created
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: debug-output

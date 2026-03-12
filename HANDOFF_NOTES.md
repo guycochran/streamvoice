@@ -1,67 +1,30 @@
 # Handoff Notes - StreamVoice GitHub Actions Fix
-## For the Next Developer
 
 ## Quick Summary
-**Problem**: GitHub Actions can't build the Electron app because electron-builder is confused by the directory structure.
-**Solution**: Move server and web folders out of electron-app directory.
-**Status**: Problem identified, solution known, not yet implemented.
+**Problem**: GitHub Actions workflows were failing fast before the real Windows packaging step completed.
 
-## What Works
-✅ Node/npm installation in GitHub Actions
-✅ Electron installation
-✅ Building a minimal Electron app from scratch
-✅ The workflows themselves (after our fixes)
+**Previous diagnosis**: `electron-builder` was supposedly confused by the `electron-app` directory structure.
 
-## What Doesn't Work
-❌ Building the actual StreamVoice electron-app
-❌ Any electron-builder command in the current structure
+**Corrected diagnosis**: The current `electron-app` structure packages successfully. The active workflow issue was more likely deprecated GitHub Actions artifact steps.
 
-## The Fix (Not Yet Done)
-```bash
-# Commands to restructure:
-mv electron-app/server ./streamvoice-server
-mv electron-app/web ./streamvoice-web
-mv electron-app/renderer ./streamvoice-renderer
-mv electron-app/scripts ./streamvoice-scripts
+## What Was Verified
+- `npx electron-builder --dir` succeeds locally from `electron-app`
+- The packaged `app.asar` includes `server/`, `web/`, `renderer/`, and assets
+- This means the current folder layout is valid for packaging
 
-# Update electron-app/main.js to reference new paths
-# Update package.json files
-# Test locally
-# Push to GitHub
-```
+## Fix Applied
+- Upgraded active workflows from `@v3` to `@v4` where needed
+- Added explicit workflow permissions for release creation
+- Changed build commands to `npx electron-builder --win --publish never`
+- Removed the debug workflow behavior that deleted app directories before building
 
-## Key Files to Check
-1. `/electron-app/main.js` - Has paths to server/web that need updating
-2. `/electron-app/package.json` - Has dependencies for server that should be moved
-3. `/.github/workflows/build-electron.yml` - Main workflow (already fixed)
-4. `/.github/workflows/build-windows.yml` - Windows workflow (already fixed)
+## Files Changed
+1. `.github/workflows/build-electron.yml`
+2. `.github/workflows/build-windows.yml`
+3. `.github/workflows/build-debug.yml`
 
-## Proof It Will Work
-Check `.github/workflows-archive/test-electron-builder.yml` - This succeeded by creating a minimal app. It proves electron-builder works when the directory structure is correct.
+## Important Warning
+Do not move `electron-app/server`, `electron-app/web`, or `electron-app/renderer` out of the app just because of the earlier notes. That restructuring is not supported by the current evidence and would create unnecessary runtime risk.
 
-## Current Directory Issues
-```
-electron-app/
-├── main.js          ✅ (belongs here)
-├── preload.js       ✅ (belongs here)
-├── package.json     ✅ (belongs here)
-├── assets/          ✅ (belongs here)
-├── server/          ❌ (move to root)
-├── web/             ❌ (move to root)
-├── renderer/        ❌ (move to root)
-└── scripts/         ❌ (move to root)
-```
-
-## Testing Approach
-1. Make the directory changes
-2. Run locally: `cd electron-app && npm install && npm run build-win`
-3. If it works locally, push to GitHub
-4. Watch the GitHub Actions run
-
-## Background Processes
-Two servers are running - you might want to kill them:
-- `ps aux | grep "node index.js"`
-- `ps aux | grep "node index-new.js"`
-
-## Good Luck!
-This should be a straightforward fix once the directories are restructured. The hard debugging work is already done - we know exactly what the problem is and how to fix it.
+## Next Step
+Push the workflow changes and inspect the next GitHub Actions run. If a failure remains, use that fresh runner log as the source of truth rather than the older restructuring hypothesis.
