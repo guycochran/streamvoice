@@ -19,10 +19,10 @@ StreamVoice gives you hands-free control of OBS Studio through natural voice com
 
 ## 📥 Download
 
-### Windows Installer
-**[Download StreamVoice Setup (Windows)](https://github.com/guycochran/streamvoice/releases/latest/download/StreamVoice-Setup.exe)**
+### Windows Installer (v1.0.0)
+**[Download StreamVoice Setup (Windows)](https://github.com/guycochran/streamvoice/releases/download/v1.0.0/StreamVoice-Setup-1.0.0.exe)**
 
-*Requires Windows 10 or later*
+*Requires Windows 10 or later • 76.8 MB*
 
 ### Other Platforms
 macOS and Linux support coming soon!
@@ -33,11 +33,12 @@ macOS and Linux support coming soon!
 
 StreamVoice requires OBS Studio with WebSocket enabled:
 
-1. Open OBS Studio (v28 or later)
-2. Go to Tools → WebSocket Server Settings
-3. Enable WebSocket server
-4. Set a password (remember it!)
-5. Click OK
+1. Open OBS Studio (v27 or later)
+2. Go to **Tools** → **WebSocket Server Settings**
+3. Check ✅ **Enable WebSocket Server**
+4. Leave **Enable Authentication** unchecked (or see troubleshooting if you need a password)
+5. Server Port: **4455** (default)
+6. Click **OK**
 
 ### 2. Install StreamVoice
 
@@ -48,9 +49,9 @@ StreamVoice requires OBS Studio with WebSocket enabled:
 
 ### 3. Connect to OBS
 
-1. Enter your OBS WebSocket password
-2. Click Connect
-3. Green status = Ready to use!
+1. StreamVoice will automatically connect when OBS is running
+2. Look for green "OBS: Connected" status in the app
+3. If it shows "OBS: Checking..." - see troubleshooting below
 
 ## 🎤 Voice Commands
 
@@ -119,4 +120,4 @@ Special thanks to:
 
 ---
 
-**Built with ❤️ for streamers**# Testing fixed workflow
+**Built with ❤️ for streamers**
