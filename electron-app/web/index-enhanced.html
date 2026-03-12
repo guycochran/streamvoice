@@ -574,7 +574,7 @@
             };
 
             try {
-                const response = await fetch('http://127.0.0.1:3030/api/settings/obs', {
+                const response = await fetch('/api/settings/obs', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -615,7 +615,7 @@
             statusDiv.textContent = '🔄 Testing OBS connection...';
 
             try {
-                const response = await fetch('http://127.0.0.1:3030/api/obs/test-connection', {
+                const response = await fetch('/api/obs/test-connection', {
                     method: 'POST'
                 });
 
@@ -636,7 +636,7 @@
         // Load settings on page load
         async function loadObsSettings() {
             try {
-                const response = await fetch('http://127.0.0.1:3030/api/settings/obs');
+                const response = await fetch('/api/settings/obs');
                 if (response.ok) {
                     const settings = await response.json();
                     if (settings) {

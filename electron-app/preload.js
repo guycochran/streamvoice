@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // OBS connection
     checkOBSConnection: () => ipcRenderer.invoke('check-obs-connection'),
+    getServerBaseUrl: () => ipcRenderer.invoke('get-server-base-url'),
 
     // Settings
     getSettings: () => ipcRenderer.invoke('get-settings'),

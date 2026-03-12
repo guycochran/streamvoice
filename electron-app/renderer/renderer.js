@@ -5,12 +5,11 @@ const obsStatusText = document.getElementById('obs-status-text');
 const webUI = document.getElementById('web-ui');
 const webUIFeedback = document.getElementById('web-ui-feedback');
 
-const WEB_UI_URL = 'http://127.0.0.1:3030/index-enhanced.html';
-
 let recognition;
 let isListening = false;
 let webUIReady = false;
 let pendingSpeechInit = false;
+let webUIBaseUrl = null;
 
 document.getElementById('minimize-btn').addEventListener('click', () => {
     window.electronAPI.minimizeWindow();
@@ -53,7 +52,7 @@ document.getElementById('start-with-windows').addEventListener('change', async (
 document.getElementById('view-commands').addEventListener('click', () => {
     if (!webUIReady) {
         setWebUIFeedback('Waiting for the local backend UI to load...', true);
-        webUI.src = WEB_UI_URL;
+        initializeWebUI(true);
     }
 
     showWebUI();
@@ -83,7 +82,17 @@ function showWebUI() {
     webUI.style.zIndex = '1000';
 }
 
-function initializeWebUI() {
+async function initializeWebUI(forceRefresh = false) {
+    try {
+        if (!webUIBaseUrl || forceRefresh) {
+            webUIBaseUrl = await window.electronAPI.getServerBaseUrl();
+        }
+    } catch (error) {
+        webUIReady = false;
+        setWebUIFeedback(`Local backend unavailable: ${error.message}`, true);
+        return;
+    }
+
     webUI.addEventListener('load', () => {
         webUIReady = true;
         setWebUIFeedback('');
@@ -99,7 +108,7 @@ function initializeWebUI() {
         setWebUIFeedback('Enhanced UI failed to load from the local backend.', true);
     });
 
-    webUI.src = WEB_UI_URL;
+    webUI.src = `${webUIBaseUrl}/index-enhanced.html`;
 }
 
 function initSpeechRecognition() {
@@ -228,7 +237,7 @@ async function init() {
         document.getElementById('start-with-windows').checked = settings.startWithWindows;
     }
 
-    initializeWebUI();
+    await initializeWebUI();
     initSpeechRecognition();
     checkOBSStatus();
     setInterval(checkOBSStatus, 5000);

@@ -7,7 +7,12 @@ let mainWindow;
 let tray;
 let serverProcess;
 let obsSettingsFilePath;
-const SERVER_BASE_URL = 'http://127.0.0.1:3030';
+const SERVER_BASE_URL_CANDIDATES = [
+  'http://127.0.0.1:3030',
+  'http://localhost:3030',
+  'http://[::1]:3030'
+];
+let resolvedServerBaseUrl = null;
 
 // Enable live reload for Electron
 if (process.env.NODE_ENV === 'development') {
@@ -120,7 +125,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.11',
+          message: 'StreamVoice v1.0.12',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -204,6 +209,46 @@ function startBackendServer() {
   }, 2000);
 }
 
+async function resolveServerBaseUrl(forceRefresh = false) {
+  if (resolvedServerBaseUrl && !forceRefresh) {
+    return resolvedServerBaseUrl;
+  }
+
+  for (const baseUrl of SERVER_BASE_URL_CANDIDATES) {
+    try {
+      const response = await fetch(`${baseUrl}/health`);
+      if (response.ok) {
+        resolvedServerBaseUrl = baseUrl;
+        return baseUrl;
+      }
+    } catch (error) {
+      // Probe the next local loopback candidate.
+    }
+  }
+
+  throw new Error('Local StreamVoice API is unavailable');
+}
+
+async function fetchFromLocalServer(pathname, options = {}) {
+  const candidateUrls = resolvedServerBaseUrl
+    ? [resolvedServerBaseUrl, ...SERVER_BASE_URL_CANDIDATES.filter((url) => url !== resolvedServerBaseUrl)]
+    : SERVER_BASE_URL_CANDIDATES;
+
+  let lastError = null;
+
+  for (const baseUrl of candidateUrls) {
+    try {
+      const response = await fetch(`${baseUrl}${pathname}`, options);
+      resolvedServerBaseUrl = baseUrl;
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Local StreamVoice API is unavailable');
+}
+
 function checkForUpdates() {
   autoUpdater.checkForUpdatesAndNotify();
 }
@@ -276,6 +321,10 @@ ipcMain.handle('get-settings', () => {
   return appSettings;
 });
 
+ipcMain.handle('get-server-base-url', async () => {
+  return await resolveServerBaseUrl();
+});
+
 ipcMain.handle('save-settings', (event, settings) => {
   appSettings = { ...appSettings, ...settings };
 
@@ -292,7 +341,7 @@ ipcMain.handle('save-settings', (event, settings) => {
 
 ipcMain.handle('check-obs-connection', async () => {
   try {
-    const response = await fetch(`${SERVER_BASE_URL}/api/obs-status`);
+    const response = await fetchFromLocalServer('/api/obs-status');
     if (!response.ok) {
       throw new Error(`OBS status request failed with ${response.status}`);
     }
@@ -304,7 +353,7 @@ ipcMain.handle('check-obs-connection', async () => {
 
 ipcMain.handle('voice-command', async (event, command) => {
   try {
-    const response = await fetch(`${SERVER_BASE_URL}/api/command`, {
+    const response = await fetchFromLocalServer('/api/command', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command })

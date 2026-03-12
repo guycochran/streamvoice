@@ -7,7 +7,7 @@ class StreamVoiceEnhanced {
         this.obsScenes = [];
         this.currentScene = '';
         this.commandCategories = {};
-        this.apiBaseUrl = 'http://127.0.0.1:3030';
+        this.apiBaseUrl = this.detectApiBaseUrl();
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -15,6 +15,7 @@ class StreamVoiceEnhanced {
         this.lastWsError = null;
         this.debugStatus = null;
         this.healthStatus = null;
+        this.wsReconnectTimer = null;
 
         // DOM elements
         this.connectionStatus = document.getElementById('connection-status');
@@ -39,8 +40,16 @@ class StreamVoiceEnhanced {
         this.loadCommandCategories();
     }
 
+    detectApiBaseUrl() {
+        if (window.location?.origin && /^https?:/i.test(window.location.origin)) {
+            return window.location.origin;
+        }
+
+        return 'http://127.0.0.1:3030';
+    }
+
     connectWebSocket() {
-        const wsUrl = 'ws://127.0.0.1:8090';  // Force IPv4 connection
+        const wsUrl = `ws://${new URL(this.apiBaseUrl).hostname}:8090`;
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -64,7 +73,8 @@ class StreamVoiceEnhanced {
             this.lastWsError = 'WebSocket connection closed';
             this.updateConnectionStatus();
             // Attempt reconnection after 3 seconds
-            setTimeout(() => this.connectWebSocket(), 3000);
+            clearTimeout(this.wsReconnectTimer);
+            this.wsReconnectTimer = setTimeout(() => this.connectWebSocket(), 3000);
         };
 
         this.ws.onerror = (error) => {
