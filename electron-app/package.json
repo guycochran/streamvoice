@@ -26,8 +26,17 @@
     "appId": "com.streamvoice.app",
     "productName": "StreamVoice",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "files": [
+      "**/*",
+      "!**/*.ts",
+      "!**/*.map",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/**/*.d.ts"
+    ],
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"

@@ -1,0 +1,60 @@
+name: Build Comprehensive
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Cache node modules
+      uses: actions/cache@v3
+      with:
+        path: electron-app/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('electron-app/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install dependencies
+      working-directory: electron-app
+      run: |
+        npm install --force
+        npm install electron-builder --save-dev --force
+
+    - name: Build Windows app
+      working-directory: electron-app
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        npx electron-builder --win --x64 --publish never
+
+    - name: List output
+      if: always()
+      working-directory: electron-app
+      run: |
+        echo "=== Build output ==="
+        if (Test-Path dist) {
+          dir dist
+        } else {
+          echo "No dist directory found"
+        }
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: StreamVoice-Build
+        path: |
+          electron-app/dist/
+          electron-app/build/
