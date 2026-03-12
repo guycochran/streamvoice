@@ -1,0 +1,12 @@
+name: Test Basic
+
+on: [push, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: echo "Hello from Windows"
+    - run: dir
+    - run: cd electron-app && dir

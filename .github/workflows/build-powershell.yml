@@ -1,0 +1,51 @@
+name: Build PowerShell
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install and Build
+      shell: pwsh
+      run: |
+        Write-Host "=== StreamVoice Build ===" -ForegroundColor Green
+
+        Set-Location electron-app
+        Write-Host "Current directory: $(Get-Location)"
+
+        Write-Host "`nInstalling dependencies..." -ForegroundColor Yellow
+        npm install --force --loglevel verbose
+
+        Write-Host "`nChecking electron-builder..." -ForegroundColor Yellow
+        npm list electron-builder
+
+        Write-Host "`nBuilding application..." -ForegroundColor Yellow
+        npm run build-win
+
+        Write-Host "`nBuild complete!" -ForegroundColor Green
+
+    - name: Check output
+      shell: pwsh
+      run: |
+        Set-Location electron-app
+        if (Test-Path dist) {
+          Write-Host "Contents of dist:" -ForegroundColor Green
+          Get-ChildItem dist -Recurse | Select-Object FullName, Length
+        }
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: StreamVoice-Windows
+        path: electron-app/dist/*.exe
