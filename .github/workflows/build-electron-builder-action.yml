@@ -1,0 +1,37 @@
+name: Build with Electron Builder Action
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+
+    - name: Install deps
+      working-directory: ./electron-app
+      run: npm install
+
+    - name: Build with electron-builder
+      uses: samuelmeuli/action-electron-builder@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        release: false
+        build_script_name: build-win
+        package_root: ./electron-app
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: StreamVoice
+        path: electron-app/dist/*.exe
