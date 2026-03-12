@@ -1,0 +1,38 @@
+name: Test Minimal Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  minimal:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - run: node --version
+    - run: npm --version
+
+    - name: Check directory
+      run: |
+        dir
+        cd electron-app
+        dir
+
+    - name: Install only production deps
+      working-directory: electron-app
+      run: npm install --production --force
+
+    - name: Install electron-builder separately
+      working-directory: electron-app
+      run: npm install electron-builder --save-dev --force
+
+    - name: Check node_modules
+      working-directory: electron-app
+      run: dir node_modules
