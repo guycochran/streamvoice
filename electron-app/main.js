@@ -7,10 +7,12 @@ let mainWindow;
 let tray;
 let serverProcess;
 let obsSettingsFilePath;
+const LOCAL_API_PORT = '3030';
+const LOCAL_WS_PORT = '8090';
 const SERVER_BASE_URL_CANDIDATES = [
-  'http://127.0.0.1:3030',
-  'http://localhost:3030',
-  'http://[::1]:3030'
+  `http://127.0.0.1:${LOCAL_API_PORT}`,
+  `http://localhost:${LOCAL_API_PORT}`,
+  `http://[::1]:${LOCAL_API_PORT}`
 ];
 let resolvedServerBaseUrl = null;
 
@@ -125,7 +127,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.13',
+          message: 'StreamVoice v1.0.14',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -167,7 +169,10 @@ function startBackendServer() {
   serverProcess = spawn(process.execPath, [serverPath], {
     env: {
       ...process.env,
+      PORT: LOCAL_API_PORT,
       ELECTRON_RUN_AS_NODE: '1',
+      STREAMVOICE_API_PORT: LOCAL_API_PORT,
+      STREAMVOICE_WS_PORT: LOCAL_WS_PORT,
       STREAMVOICE_OBS_SETTINGS_FILE: obsSettingsFilePath || ''
     },
     stdio: ['pipe', 'pipe', 'pipe', 'ipc']

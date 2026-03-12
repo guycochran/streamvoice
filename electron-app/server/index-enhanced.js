@@ -16,7 +16,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'web')));
 
 // WebSocket server for client communication
-const wss = new WebSocket.Server({ port: 8090 });
+const WS_PORT = Number(process.env.STREAMVOICE_WS_PORT || 8090);
+const wss = new WebSocket.Server({ port: WS_PORT });
 
 // OBS WebSocket instance
 const obs = new OBSWebSocket();
@@ -78,7 +79,7 @@ let lastStateRefreshError = null;
 const systemHealth = {
   app: {
     status: 'healthy',
-    version: '1.0.13',
+    version: '1.0.14',
     startTime: Date.now(),
     pid: process.pid,
     lastError: null
@@ -86,12 +87,12 @@ const systemHealth = {
   backend: {
     status: 'healthy', // healthy, degraded, failed
     httpApi: {
-      port: process.env.PORT || 3030,
+      port: Number(process.env.STREAMVOICE_API_PORT || process.env.PORT || 3030),
       status: 'healthy',
       lastError: null
     },
     webSocket: {
-      port: 8090,
+      port: WS_PORT,
       status: 'healthy',
       clients: 0,
       lastError: null
@@ -1106,11 +1107,11 @@ app.post('/api/obs/test-connection', async (req, res) => {
 });
 
 // Start servers
-const PORT = process.env.PORT || 3030;
+const PORT = Number(process.env.STREAMVOICE_API_PORT || process.env.PORT || 3030);
 loadObsSettings();
 app.listen(PORT, () => {
   console.log(`StreamVoice API running on http://localhost:${PORT}`);
-  console.log(`WebSocket server running on ws://localhost:8090`);
+  console.log(`WebSocket server running on ws://localhost:${WS_PORT}`);
   console.log(`\n✨ StreamVoice Enhanced Server v${systemHealth.app.version} Ready!`);
   console.log(`📝 ${Object.keys(COMMAND_MAP).length} voice commands available`);
   console.log(`🎯 Features: Advanced OBS control, Stream Deck macros, Audio mixer, Transitions`);
