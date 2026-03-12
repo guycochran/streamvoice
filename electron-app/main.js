@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, dialog } = require('electron');
+const http = require('http');
 const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
@@ -127,7 +128,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.14',
+          message: 'StreamVoice v1.0.15',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -221,8 +222,8 @@ async function resolveServerBaseUrl(forceRefresh = false) {
 
   for (const baseUrl of SERVER_BASE_URL_CANDIDATES) {
     try {
-      const response = await fetch(`${baseUrl}/health`);
-      if (response.ok) {
+      const response = await requestLocalJson(baseUrl, '/health');
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         resolvedServerBaseUrl = baseUrl;
         return baseUrl;
       }
@@ -243,7 +244,7 @@ async function fetchFromLocalServer(pathname, options = {}) {
 
   for (const baseUrl of candidateUrls) {
     try {
-      const response = await fetch(`${baseUrl}${pathname}`, options);
+      const response = await requestLocalJson(baseUrl, pathname, options);
       resolvedServerBaseUrl = baseUrl;
       return response;
     } catch (error) {
@@ -252,6 +253,68 @@ async function fetchFromLocalServer(pathname, options = {}) {
   }
 
   throw lastError || new Error('Local StreamVoice API is unavailable');
+}
+
+function requestLocalJson(baseUrl, pathname, options = {}) {
+  const url = new URL(pathname, baseUrl);
+  const method = options.method || 'GET';
+  const headers = { ...(options.headers || {}) };
+  const body = options.body || null;
+
+  if (body && !headers['Content-Length']) {
+    headers['Content-Length'] = Buffer.byteLength(body);
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port,
+      path: `${url.pathname}${url.search}`,
+      method,
+      headers,
+      timeout: 3000
+    }, (response) => {
+      let raw = '';
+
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        raw += chunk;
+      });
+
+      response.on('end', () => {
+        let json = null;
+        if (raw) {
+          try {
+            json = JSON.parse(raw);
+          } catch (error) {
+            return reject(new Error(`Invalid JSON from local API: ${error.message}`));
+          }
+        }
+
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status: response.statusCode,
+          statusCode: response.statusCode,
+          json: async () => json
+        });
+      });
+    });
+
+    request.on('timeout', () => {
+      request.destroy(new Error('Local API request timed out'));
+    });
+
+    request.on('error', (error) => {
+      reject(error);
+    });
+
+    if (body) {
+      request.write(body);
+    }
+
+    request.end();
+  });
 }
 
 function checkForUpdates() {
