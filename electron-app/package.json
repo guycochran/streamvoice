@@ -33,11 +33,12 @@
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": true,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "StreamVoice"
+      "shortcutName": "StreamVoice",
+      "artifactName": "StreamVoice-Setup-${version}.${ext}"
     }
   }
 }

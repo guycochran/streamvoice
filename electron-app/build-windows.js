@@ -53,8 +53,8 @@ builder.build({
             createDesktopShortcut: true,
             createStartMenuShortcut: true,
             shortcutName: 'StreamVoice',
-            license: '../LICENSE',
-            warningsAsErrors: false
+            warningsAsErrors: false,
+            artifactName: 'StreamVoice-Setup-${version}.${ext}'
         },
         publish: {
             provider: 'github',
