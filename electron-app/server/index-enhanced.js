@@ -78,7 +78,7 @@ let lastStateRefreshError = null;
 const systemHealth = {
   app: {
     status: 'healthy',
-    version: '1.0.7',
+    version: '1.0.10',
     startTime: Date.now(),
     pid: process.pid,
     lastError: null
