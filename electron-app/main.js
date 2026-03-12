@@ -49,10 +49,13 @@ function createWindow() {
   // Load the app
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
-  // Show window when ready
+  // Show window when ready AND server is running
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    checkForUpdates();
+    // Give server time to start
+    setTimeout(() => {
+      mainWindow.show();
+      checkForUpdates();
+    }, 2000); // 2 second delay for server startup
   });
 
   // Minimize to tray instead of closing

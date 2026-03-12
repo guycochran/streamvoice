@@ -5,8 +5,14 @@ const OBSWebSocket = require('obs-websocket-js').default;
 const path = require('path');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow all origins in Electron app
+  credentials: true
+}));
 app.use(express.json());
+
+// Serve static files from the web directory
+app.use(express.static(path.join(__dirname, '..', 'web')));
 
 // WebSocket server for client communication
 const wss = new WebSocket.Server({ port: 8090 });
@@ -42,7 +48,7 @@ let lastStateRefreshError = null;
 const systemHealth = {
   app: {
     status: 'healthy',
-    version: '1.0.6',
+    version: '1.0.7',
     startTime: Date.now(),
     pid: process.pid,
     lastError: null

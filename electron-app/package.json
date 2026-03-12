@@ -1,6 +1,6 @@
 {
   "name": "streamvoice",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Professional voice control for OBS Studio",
   "main": "main.js",
   "scripts": {
@@ -50,7 +50,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "StreamVoice",
-      "artifactName": "StreamVoice-Setup-${version}.${ext}"
+      "artifactName": "StreamVoice-Setup-${version}.${ext}",
+      "include": "build/installer.nsh"
     }
   }
 }
