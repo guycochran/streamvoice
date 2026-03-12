@@ -1,0 +1,48 @@
+name: Build Fresh Install
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Remove package-lock and install fresh
+      working-directory: electron-app
+      run: |
+        echo "=== Removing package-lock.json ==="
+        if (Test-Path package-lock.json) {
+          Remove-Item package-lock.json
+          echo "✓ Removed package-lock.json"
+        }
+
+        echo "=== Fresh npm install ==="
+        npm install
+
+        echo "=== Listing installed packages ==="
+        npm list --depth=0
+
+    - name: Build application
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "=== Building application ==="
+        npm run build-win -- --publish never
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: fresh-install-build
+        path: electron-app/dist/*.exe
+        retention-days: 7

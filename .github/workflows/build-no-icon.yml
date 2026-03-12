@@ -1,0 +1,68 @@
+name: Build No Icon
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Create minimal package.json
+      working-directory: electron-app
+      run: |
+        @'
+        {
+          "name": "streamvoice",
+          "version": "1.0.0",
+          "main": "main.js",
+          "scripts": {
+            "build-win": "electron-builder --win"
+          },
+          "devDependencies": {
+            "electron": "^28.0.0",
+            "electron-builder": "^24.9.1"
+          },
+          "dependencies": {
+            "express": "^4.18.2",
+            "obs-websocket-js": "^5.0.5"
+          },
+          "build": {
+            "appId": "com.streamvoice.app",
+            "productName": "StreamVoice",
+            "directories": {
+              "output": "dist"
+            },
+            "win": {
+              "target": "nsis"
+            },
+            "nsis": {
+              "artifactName": "StreamVoice-Setup-${version}.exe"
+            }
+          }
+        }
+        '@ | Out-File -Encoding UTF8 package.json
+
+    - name: Install dependencies
+      working-directory: electron-app
+      run: npm install
+
+    - name: Build without icon
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: npm run build-win -- --publish never
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: no-icon-build
+        path: electron-app/dist/*.exe

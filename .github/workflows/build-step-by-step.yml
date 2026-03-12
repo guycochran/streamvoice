@@ -1,0 +1,65 @@
+name: Build Step by Step
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install dependencies one by one
+      working-directory: electron-app
+      run: |
+        echo "=== Installing express ==="
+        npm install express --save
+
+        echo "=== Installing obs-websocket-js ==="
+        npm install obs-websocket-js --save
+
+        echo "=== Installing electron-updater ==="
+        npm install electron-updater --save
+
+        echo "=== Installing electron ==="
+        npm install electron --save-dev
+
+        echo "=== Installing electron-builder ==="
+        npm install electron-builder --save-dev
+
+        echo "=== Installing electron-reload ==="
+        npm install electron-reload --save-dev
+
+    - name: Verify installation
+      working-directory: electron-app
+      run: |
+        echo "=== Node modules size ==="
+        du -sh node_modules
+        echo "=== Electron version ==="
+        npx electron --version
+        echo "=== Electron-builder version ==="
+        npx electron-builder --version
+
+    - name: Build application
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: |
+        echo "=== Starting build ==="
+        npm run build-win -- --publish never
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: step-by-step-build
+        path: |
+          electron-app/dist/
+          electron-app/npm-debug.log
