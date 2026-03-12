@@ -23,35 +23,5 @@
     "electron-updater": "^6.1.7",
     "ws": "^8.14.2",
     "cors": "^2.8.5"
-  },
-  "build": {
-    "appId": "com.streamvoice.app",
-    "productName": "StreamVoice",
-    "directories": {
-      "output": "dist",
-      "buildResources": "build"
-    },
-    "files": [
-      "**/*",
-      "!**/*.ts",
-      "!**/*.map",
-      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
-      "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-      "!node_modules/**/*.d.ts"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "StreamVoice",
-      "artifactName": "StreamVoice-Setup-${version}.${ext}",
-      "include": "build/installer.nsh"
-    }
   }
 }
