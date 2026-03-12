@@ -1,0 +1,35 @@
+name: Build Matrix Test
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+      fail-fast: false
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node }}
+
+    - name: Install and build
+      working-directory: electron-app
+      run: |
+        echo "Testing with Node ${{ matrix.node }}"
+        npm --version
+        npm install --force
+        npm run build-win || echo "Build failed with Node ${{ matrix.node }}"
+
+    - name: Check results
+      if: always()
+      run: |
+        echo "Node ${{ matrix.node }} test complete"

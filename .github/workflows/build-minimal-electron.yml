@@ -1,0 +1,42 @@
+name: Build Minimal Electron
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-minimal:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 20
+
+    - name: Create minimal package.json
+      working-directory: electron-app
+      run: |
+        echo '{
+          "name": "minimal-test",
+          "version": "1.0.0",
+          "main": "minimal-test.js",
+          "scripts": {
+            "test": "electron ."
+          }
+        }' > minimal-package.json
+
+    - name: Install electron only
+      working-directory: electron-app
+      run: |
+        npm init -y
+        npm install electron --save-dev --force
+        npm list electron
+
+    - name: Test electron
+      working-directory: electron-app
+      run: |
+        npx electron --version
+        echo "Electron installed successfully"
