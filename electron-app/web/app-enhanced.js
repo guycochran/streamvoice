@@ -503,7 +503,7 @@ class StreamVoiceEnhanced {
 
     async loadCommandCategories() {
         try {
-            const response = await fetch('http://localhost:3030/commands');
+            const response = await fetch(`${this.apiBaseUrl}/commands`);
             const data = await response.json();
 
             if (data.categories) {

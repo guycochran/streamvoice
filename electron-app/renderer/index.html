@@ -44,7 +44,7 @@
                 <span class="status-dot active"></span>
                 <span>Voice: Ready</span>
             </div>
-            <div class="version">v1.0.10</div>
+            <div class="version">v1.0.11</div>
         </div>
 
         <!-- Main Control -->
@@ -105,11 +105,12 @@
                 <button class="settings-btn" id="view-commands">View All Commands</button>
                 <button class="settings-btn" id="check-updates">Check for Updates</button>
             </div>
+            <div class="command-feedback" id="web-ui-feedback" style="display: none;"></div>
         </div>
     </div>
 
     <!-- Hidden iframe for web UI -->
-    <iframe id="web-ui" src="http://localhost:3030/index-enhanced.html" style="display: none;"></iframe>
+    <iframe id="web-ui" src="http://127.0.0.1:3030/index-enhanced.html" style="display: none;"></iframe>
 
     <script src="renderer.js"></script>
 </body>
