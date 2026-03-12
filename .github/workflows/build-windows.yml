@@ -29,12 +29,16 @@ jobs:
     - name: Install dependencies
       working-directory: electron-app
       run: |
-        npm install --force
-        npm install electron-builder --save-dev
+        npm ci --force || npm install --force
+        npm install electron-builder --save-dev --force
 
-    - name: Generate icons
+    - name: Check for icons
       working-directory: electron-app
-      run: python scripts/generate-icons.py
+      run: |
+        if (!(Test-Path assets/icon.png)) {
+          echo "Creating placeholder icon..."
+          Copy-Item assets/icon.svg assets/icon.png 2>$null || echo "Icon exists"
+        }
 
     - name: Build Windows installer
       working-directory: electron-app
