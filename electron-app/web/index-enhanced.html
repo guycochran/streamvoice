@@ -188,7 +188,7 @@
                     <span class="status-text">Disconnected</span>
                 </div>
                 <div style="margin-top: 10px; font-size: 12px; color: #666; text-align: center;">
-                    <span id="connection-details">WebSocket: ws://localhost:8090</span>
+                    <span id="connection-details">Transport: offline | OBS unknown</span>
                 </div>
             </div>
 
@@ -292,6 +292,14 @@
                 <h3>OBS Status</h3>
                 <div class="status-panel">
                     <div class="status-item">
+                        <h5>Backend</h5>
+                        <div class="value" id="backend-status">OFFLINE</div>
+                    </div>
+                    <div class="status-item">
+                        <h5>Transport</h5>
+                        <div class="value" id="transport-status">OFFLINE</div>
+                    </div>
+                    <div class="status-item">
                         <h5>Current Scene</h5>
                         <div class="value" id="current-scene">-</div>
                     </div>
@@ -307,10 +315,19 @@
                         <h5>Available Scenes</h5>
                         <div class="value" id="scene-count">0</div>
                     </div>
+                    <div class="status-item">
+                        <h5>WS Clients</h5>
+                        <div class="value" id="ws-client-count">-</div>
+                    </div>
+                    <div class="status-item">
+                        <h5>Last Error</h5>
+                        <div class="value" id="last-error">None</div>
+                    </div>
                 </div>
                 <div id="scene-list" style="margin-top: 20px;">
                     <!-- Scene list will be populated here -->
                 </div>
+                <pre id="status-debug" style="margin-top: 20px; white-space: pre-wrap; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; color: #b9c0d0; font-size: 12px;">Loading diagnostics...</pre>
             </div>
         </main>
 
@@ -336,15 +353,11 @@
         }
 
         // Execute command directly
-        function executeCommand(command) {
-            if (window.streamVoice && window.streamVoice.ws.readyState === WebSocket.OPEN) {
-                window.streamVoice.ws.send(JSON.stringify({
-                    type: 'voice_command',
-                    text: command
-                }));
-                window.streamVoice.addToHistory(command);
+        async function executeCommand(command) {
+            if (window.streamVoice) {
+                await window.streamVoice.executeCommand(command);
             } else {
-                alert('Not connected to StreamVoice server!');
+                alert('StreamVoice UI is not ready yet.');
             }
         }
 
@@ -352,7 +365,9 @@
         function toggleMute(source) {
             const button = event.target;
             const isMuted = button.classList.contains('muted');
-            const command = isMuted ? `unmute my ${source}` : `mute my ${source}`;
+            const command = source === 'desktop'
+                ? (isMuted ? 'unmute desktop' : 'mute desktop')
+                : (isMuted ? 'unmute my mic' : 'mute my mic');
 
             executeCommand(command);
 

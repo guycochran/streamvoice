@@ -9,6 +9,11 @@ class StreamVoiceEnhanced {
         this.commandCategories = {};
         this.apiBaseUrl = 'http://127.0.0.1:3030';
         this.statusPollInterval = null;
+        this.serverReachable = false;
+        this.wsConnected = false;
+        this.lastApiError = null;
+        this.lastWsError = null;
+        this.debugStatus = null;
 
         // DOM elements
         this.connectionStatus = document.getElementById('connection-status');
@@ -39,7 +44,9 @@ class StreamVoiceEnhanced {
 
         this.ws.onopen = () => {
             console.log('Connected to StreamVoice server');
-            this.updateConnectionStatus('connected');
+            this.wsConnected = true;
+            this.lastWsError = null;
+            this.updateConnectionStatus();
 
             // Request current status
             this.ws.send(JSON.stringify({ type: 'get_status' }));
@@ -52,12 +59,18 @@ class StreamVoiceEnhanced {
 
         this.ws.onclose = () => {
             console.log('Disconnected from server');
+            this.wsConnected = false;
+            this.lastWsError = 'WebSocket connection closed';
+            this.updateConnectionStatus();
             // Attempt reconnection after 3 seconds
             setTimeout(() => this.connectWebSocket(), 3000);
         };
 
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
+            this.wsConnected = false;
+            this.lastWsError = 'WebSocket error';
+            this.updateConnectionStatus();
         };
     }
 
@@ -70,22 +83,29 @@ class StreamVoiceEnhanced {
 
     async refreshStatusFromApi() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/api/obs-status`);
+            const response = await fetch(`${this.apiBaseUrl}/api/debug/status`);
             if (!response.ok) {
                 throw new Error(`Status request failed with ${response.status}`);
             }
 
             const status = await response.json();
+            this.serverReachable = true;
+            this.lastApiError = null;
+            this.debugStatus = status;
             this.obsConnected = Boolean(status.connected);
             this.obsScenes = status.scenes || [];
             this.currentScene = status.currentScene || '';
-            this.updateConnectionStatus('connected');
+            this.updateConnectionStatus();
             this.updateOBSStatus();
+            this.renderDiagnostics();
         } catch (error) {
             console.error('Failed to refresh OBS status:', error);
+            this.serverReachable = false;
+            this.lastApiError = error.message;
             this.obsConnected = false;
-            this.updateConnectionStatus('disconnected');
+            this.updateConnectionStatus();
             this.updateOBSStatus();
+            this.renderDiagnostics();
         }
     }
 
@@ -100,11 +120,13 @@ class StreamVoiceEnhanced {
                     this.showNotification(`📝 ${message.commands} commands available`, 'info');
                 }
                 this.obsConnected = message.obsConnected;
+                this.wsConnected = true;
                 if (message.obsScenes) {
                     this.obsScenes = message.obsScenes;
                     this.currentScene = message.currentScene;
                     this.updateOBSStatus();
                 }
+                this.updateConnectionStatus();
                 break;
 
             case 'obs_connected':
@@ -160,6 +182,7 @@ class StreamVoiceEnhanced {
                 this.obsScenes = message.scenes || [];
                 this.currentScene = message.currentScene || '';
                 this.updateOBSStatus();
+                this.updateConnectionStatus();
                 if (message.commands) {
                     this.displayCommands(message.commands);
                 }
@@ -268,23 +291,27 @@ class StreamVoiceEnhanced {
         }
     }
 
-    updateConnectionStatus(status) {
+    updateConnectionStatus() {
         const statusText = this.connectionStatus.querySelector('.status-text');
+        let status = 'disconnected';
+        let label = 'Disconnected';
+
+        if (this.serverReachable && this.wsConnected) {
+            status = 'connected';
+            label = 'Connected';
+        } else if (this.serverReachable) {
+            status = 'connected';
+            label = 'HTTP Only';
+        }
 
         this.connectionStatus.className = 'status ' + status;
+        statusText.textContent = label;
+        this.voiceButton.disabled = !this.serverReachable;
 
-        switch (status) {
-            case 'connected':
-                statusText.textContent = 'Connected';
-                break;
-            case 'disconnected':
-                statusText.textContent = 'Disconnected';
-                this.voiceButton.disabled = true;
-                break;
-            case 'error':
-                statusText.textContent = 'Connection Error';
-                this.voiceButton.disabled = true;
-                break;
+        if (this.connectionDetails) {
+            const transport = this.wsConnected ? 'WS+HTTP' : (this.serverReachable ? 'HTTP fallback' : 'offline');
+            const obs = this.obsConnected ? 'OBS connected' : 'OBS not connected';
+            this.connectionDetails.textContent = `Transport: ${transport} | ${obs}`;
         }
     }
 
@@ -308,6 +335,48 @@ class StreamVoiceEnhanced {
         if (obsStatus) {
             obsStatus.textContent = this.obsConnected ? 'Connected' : 'Not Connected';
             obsStatus.style.color = this.obsConnected ? '#2ecc71' : '#e74c3c';
+        }
+    }
+
+    renderDiagnostics() {
+        const backendStatus = document.getElementById('backend-status');
+        const transportStatus = document.getElementById('transport-status');
+        const wsClients = document.getElementById('ws-client-count');
+        const lastError = document.getElementById('last-error');
+        const statusDebug = document.getElementById('status-debug');
+
+        if (backendStatus) {
+            backendStatus.textContent = this.serverReachable ? 'ONLINE' : 'OFFLINE';
+            backendStatus.style.color = this.serverReachable ? '#2ecc71' : '#e74c3c';
+        }
+
+        if (transportStatus) {
+            transportStatus.textContent = this.wsConnected ? 'WS + HTTP' : (this.serverReachable ? 'HTTP ONLY' : 'OFFLINE');
+            transportStatus.style.color = this.serverReachable ? '#2ecc71' : '#e74c3c';
+        }
+
+        if (wsClients) {
+            wsClients.textContent = this.debugStatus?.websocketClients ?? '-';
+        }
+
+        const errorText = this.lastApiError || this.lastWsError || this.debugStatus?.lastObsError || this.debugStatus?.lastStateRefreshError || 'None';
+        if (lastError) {
+            lastError.textContent = errorText;
+            lastError.style.color = errorText === 'None' ? '#2ecc71' : '#f39c12';
+        }
+
+        if (statusDebug) {
+            const lines = [
+                `HTTP API: ${this.serverReachable ? 'reachable' : 'unreachable'}`,
+                `WebSocket 8090: ${this.wsConnected ? 'connected' : 'disconnected'}`,
+                `OBS 4455: ${this.obsConnected ? 'connected' : 'not connected'}`,
+                `OBS URL: ${this.debugStatus?.obsWebSocketUrl || 'unknown'}`,
+                `Server PID: ${this.debugStatus?.pid || 'unknown'}`,
+                `Uptime: ${this.debugStatus?.uptimeSeconds ?? 'unknown'}s`,
+                `Last OBS error: ${this.debugStatus?.lastObsError || 'none'}`,
+                `Last refresh error: ${this.debugStatus?.lastStateRefreshError || 'none'}`
+            ];
+            statusDebug.textContent = lines.join('\n');
         }
     }
 

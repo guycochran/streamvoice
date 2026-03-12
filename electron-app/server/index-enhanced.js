@@ -28,12 +28,15 @@ let obsTransitions = [];
 let obsCurrentTransition = '';
 let obsSceneCollections = [];
 let obsProfiles = [];
+let lastObsError = null;
+let lastStateRefreshError = null;
 
 // Connect to OBS
 async function connectToOBS() {
   try {
     await obs.connect(OBS_WEBSOCKET_URL, OBS_PASSWORD);
     obsConnected = true;
+    lastObsError = null;
     console.log('✅ Connected to OBS WebSocket');
 
     // Get initial state
@@ -52,6 +55,7 @@ async function connectToOBS() {
   } catch (error) {
     console.error('❌ Failed to connect to OBS:', error.message);
     obsConnected = false;
+    lastObsError = error.message;
     setTimeout(connectToOBS, 5000); // Retry in 5 seconds
   }
 }
@@ -87,7 +91,25 @@ async function refreshOBSState() {
     console.log(`🎬 Transitions: ${obsTransitions.join(', ')}`);
   } catch (error) {
     console.error('Error refreshing OBS state:', error);
+    lastStateRefreshError = error.message;
   }
+}
+
+function getDebugStatus() {
+  return {
+    connected: obsConnected,
+    currentScene: obsCurrentScene,
+    scenes: obsScenes,
+    inputs: obsInputs.map(input => input.inputName),
+    transitions: obsTransitions,
+    currentTransition: obsCurrentTransition,
+    websocketClients: wss.clients.size,
+    obsWebSocketUrl: OBS_WEBSOCKET_URL,
+    lastObsError,
+    lastStateRefreshError,
+    pid: process.pid,
+    uptimeSeconds: Math.round(process.uptime())
+  };
 }
 
 // Broadcast message to all connected clients
@@ -765,14 +787,7 @@ function findSuggestions(input) {
 
 // REST API endpoints
 app.get('/api/obs-status', (req, res) => {
-  res.json({
-    connected: obsConnected,
-    currentScene: obsCurrentScene,
-    scenes: obsScenes,
-    inputs: obsInputs.map(input => input.inputName),
-    transitions: obsTransitions,
-    currentTransition: obsCurrentTransition
-  });
+  res.json(getDebugStatus());
 });
 
 app.get('/health', (req, res) => {
@@ -789,6 +804,10 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     connected: obsConnected
   });
+});
+
+app.get('/api/debug/status', (req, res) => {
+  res.json(getDebugStatus());
 });
 
 app.get('/commands', (req, res) => {
