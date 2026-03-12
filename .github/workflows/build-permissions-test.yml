@@ -1,0 +1,45 @@
+name: Build Permissions Test
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Check file permissions
+      working-directory: electron-app
+      run: |
+        Get-ChildItem -Path . -Recurse | Select-Object FullName, Mode | Out-String
+
+    - name: Fix permissions
+      working-directory: electron-app
+      run: |
+        icacls . /grant Everyone:F /T
+
+    - name: Install with elevated permissions
+      working-directory: electron-app
+      run: |
+        npm config set unsafe-perm true
+        npm install --force
+
+    - name: Build with debugging
+      working-directory: electron-app
+      env:
+        DEBUG: '*'
+        ELECTRON_ENABLE_LOGGING: '1'
+      run: npm run build-win

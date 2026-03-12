@@ -1,0 +1,42 @@
+name: Build Manual Versions
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Manual install specific versions
+      working-directory: electron-app
+      run: |
+        Remove-Item package-lock.json -ErrorAction SilentlyContinue
+        npm init -y
+        npm install electron@28.0.0 --save-dev --force
+        npm install electron-builder@24.9.1 --save-dev --force
+        npm install express@4.18.2 --save --force
+        npm install obs-websocket-js@5.0.5 --save --force
+        npm install electron-updater@6.1.7 --save --force
+        npm install electron-reload@2.0.0-alpha.1 --save-dev --force
+
+    - name: Copy package.json
+      working-directory: electron-app
+      run: |
+        Copy-Item ../electron-app/package.json . -Force
+
+    - name: List installed
+      working-directory: electron-app
+      run: npm list
+
+    - name: Try build
+      working-directory: electron-app
+      run: npx electron-builder --win
