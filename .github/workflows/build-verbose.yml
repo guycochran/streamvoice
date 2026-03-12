@@ -1,0 +1,79 @@
+name: Build Verbose Debug
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Check environment
+      run: |
+        echo "Node version:"
+        node --version
+        echo "NPM version:"
+        npm --version
+        echo "Current directory:"
+        pwd
+        echo "Directory contents:"
+        dir
+
+    - name: Navigate and check electron-app
+      run: |
+        cd electron-app
+        echo "In electron-app directory:"
+        pwd
+        echo "Files:"
+        dir
+        echo "Package.json exists:"
+        if (Test-Path package.json) { echo "YES" } else { echo "NO" }
+
+    - name: Install with verbose logging
+      working-directory: electron-app
+      run: |
+        echo "Starting npm install..."
+        npm install --force --verbose
+        echo "Install completed"
+
+    - name: List installed packages
+      working-directory: electron-app
+      run: |
+        echo "Installed packages:"
+        npm list --depth=0
+
+    - name: Check electron-builder
+      working-directory: electron-app
+      run: |
+        echo "Checking for electron-builder..."
+        npm list electron-builder
+
+    - name: Try build with error details
+      working-directory: electron-app
+      run: |
+        echo "Starting build..."
+        npm run build-win --verbose 2>&1
+        echo "Build completed"
+      continue-on-error: true
+
+    - name: Check dist directory
+      working-directory: electron-app
+      if: always()
+      run: |
+        echo "Checking dist directory..."
+        if (Test-Path dist) {
+          echo "Dist exists"
+          dir dist
+        } else {
+          echo "Dist does not exist"
+        }
