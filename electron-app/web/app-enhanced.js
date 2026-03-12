@@ -7,6 +7,8 @@ class StreamVoiceEnhanced {
         this.obsScenes = [];
         this.currentScene = '';
         this.commandCategories = {};
+        this.apiBaseUrl = 'http://127.0.0.1:3030';
+        this.statusPollInterval = null;
 
         // DOM elements
         this.connectionStatus = document.getElementById('connection-status');
@@ -25,6 +27,7 @@ class StreamVoiceEnhanced {
 
     init() {
         this.connectWebSocket();
+        this.startStatusPolling();
         this.setupSpeechRecognition();
         this.setupEventListeners();
         this.loadCommandCategories();
@@ -49,15 +52,41 @@ class StreamVoiceEnhanced {
 
         this.ws.onclose = () => {
             console.log('Disconnected from server');
-            this.updateConnectionStatus('disconnected');
             // Attempt reconnection after 3 seconds
             setTimeout(() => this.connectWebSocket(), 3000);
         };
 
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
-            this.updateConnectionStatus('error');
         };
+    }
+
+    startStatusPolling() {
+        this.refreshStatusFromApi();
+        this.statusPollInterval = setInterval(() => {
+            this.refreshStatusFromApi();
+        }, 3000);
+    }
+
+    async refreshStatusFromApi() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/obs-status`);
+            if (!response.ok) {
+                throw new Error(`Status request failed with ${response.status}`);
+            }
+
+            const status = await response.json();
+            this.obsConnected = Boolean(status.connected);
+            this.obsScenes = status.scenes || [];
+            this.currentScene = status.currentScene || '';
+            this.updateConnectionStatus('connected');
+            this.updateOBSStatus();
+        } catch (error) {
+            console.error('Failed to refresh OBS status:', error);
+            this.obsConnected = false;
+            this.updateConnectionStatus('disconnected');
+            this.updateOBSStatus();
+        }
     }
 
     handleServerMessage(message) {
@@ -158,12 +187,8 @@ class StreamVoiceEnhanced {
             this.transcript.textContent = transcript;
             this.transcript.style.color = event.results[last].isFinal ? '#fff' : '#95a5a6';
 
-            if (event.results[last].isFinal && this.ws.readyState === WebSocket.OPEN) {
-                this.ws.send(JSON.stringify({
-                    type: 'voice_command',
-                    text: transcript.toLowerCase()
-                }));
-                this.addToHistory(transcript);
+            if (event.results[last].isFinal) {
+                this.executeCommand(transcript.toLowerCase());
             }
         };
 
@@ -363,7 +388,7 @@ class StreamVoiceEnhanced {
         }
     }
 
-    executeCommand(command) {
+    async executeCommand(command) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({
                 type: 'voice_command',
@@ -371,7 +396,29 @@ class StreamVoiceEnhanced {
             }));
             this.addToHistory(command);
         } else {
-            this.showNotification('Not connected to StreamVoice server!', 'error');
+            try {
+                const response = await fetch(`${this.apiBaseUrl}/api/command`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command })
+                });
+
+                const result = await response.json();
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.error || result.message || `Command failed with ${response.status}`);
+                }
+
+                this.result.textContent = result.message || 'Command executed';
+                this.result.style.color = '#2ecc71';
+                this.addToHistory(command);
+                this.showNotification(`✅ ${result.message || 'Command executed'}`, 'success');
+                this.refreshStatusFromApi();
+            } catch (error) {
+                console.error('HTTP command execution failed:', error);
+                this.showNotification(error.message || 'Not connected to StreamVoice server!', 'error');
+            }
         }
     }
 }
