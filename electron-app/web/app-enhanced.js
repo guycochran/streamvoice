@@ -34,7 +34,9 @@ class StreamVoiceEnhanced {
     }
 
     init() {
-        this.connectWebSocket();
+        if (!this.hasDesktopBridge) {
+            this.connectWebSocket();
+        }
         this.startStatusPolling();
         this.setupSpeechRecognition();
         this.setupEventListeners();
@@ -538,6 +540,18 @@ class StreamVoiceEnhanced {
     }
 
     async loadCommandCategories() {
+        if (this.hasDesktopBridge) {
+            this.displayCommandCategories({
+                scenes: ['switch to gameplay', 'switch to starting', 'switch to break'],
+                recording: ['start recording'],
+                streaming: ['start streaming'],
+                audio: ['mute mic', 'unmute mic'],
+                macros: ['stream starting setup', 'emergency mute', 'raid mode', 'subscriber celebration'],
+                other: ['take screenshot']
+            });
+            return;
+        }
+
         try {
             const response = await fetch(`${this.apiBaseUrl}/commands`);
             const data = await response.json();
@@ -670,8 +684,13 @@ class StreamVoiceEnhanced {
         try {
             let result;
 
-            // Try WebSocket first if available
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            if (this.hasDesktopBridge && window.electronAPI?.desktopExecuteCommand) {
+                result = await window.electronAPI.desktopExecuteCommand(commandData.command);
+                if (!result.success) {
+                    throw new Error(result.error || result.message || 'Command failed');
+                }
+            } else if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                // Try WebSocket first if available
                 result = await this.executeViaWebSocket(commandData);
             } else {
                 // Fall back to HTTP
@@ -950,10 +969,13 @@ Last WebSocket Error: ${this.lastWsError || 'none'}
 `;
 
         // Environment
+        const connectionType = this.hasDesktopBridge
+            ? 'Desktop IPC'
+            : (this.wsConnected ? 'WebSocket' : (this.serverReachable ? 'HTTP Fallback' : 'Disconnected'));
         report += `\n=== ENVIRONMENT ===
 Platform: ${navigator.platform}
 User Agent: ${navigator.userAgent}
-Connection Type: ${this.wsConnected ? 'WebSocket' : (this.serverReachable ? 'HTTP Fallback' : 'Disconnected')}
+Connection Type: ${connectionType}
 `;
 
         return report;

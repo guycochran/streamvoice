@@ -34,6 +34,7 @@ let desktopObsState = {
     password: ''
   }
 };
+let desktopCommandHistory = [];
 
 // Enable live reload for Electron
 if (process.env.NODE_ENV === 'development') {
@@ -228,7 +229,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.1',
+          message: 'StreamVoice v1.1.0-alpha.2',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -371,6 +372,16 @@ function getDesktopObsStatus() {
   };
 }
 
+function pushDesktopCommandHistory(entry) {
+  desktopCommandHistory.push({
+    ...entry,
+    timestamp: new Date().toISOString()
+  });
+  if (desktopCommandHistory.length > 50) {
+    desktopCommandHistory = desktopCommandHistory.slice(-50);
+  }
+}
+
 function getDesktopHealthStatus() {
   const startTime = app.getAppMetrics?.()[0]?.creationTime || Date.now();
 
@@ -424,6 +435,136 @@ function broadcastDesktopStatus() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('desktop-status-updated', getDesktopObsStatus());
   }
+}
+
+async function getDesktopSceneState() {
+  const { scenes, currentProgramSceneName } = await desktopObs.call('GetSceneList');
+  return {
+    currentScene: currentProgramSceneName,
+    scenes: scenes.map((scene) => scene.sceneName)
+  };
+}
+
+async function findDesktopInput(target) {
+  const { inputs } = await desktopObs.call('GetInputList');
+  return inputs.find((input) => input.inputName.toLowerCase().includes(target.toLowerCase()));
+}
+
+async function desktopSwitchToScene(targetScene) {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const { scenes } = await getDesktopSceneState();
+  const sceneName = scenes.find((scene) =>
+    scene.toLowerCase() === targetScene.toLowerCase() ||
+    scene.toLowerCase().includes(targetScene.toLowerCase()) ||
+    targetScene.toLowerCase().includes(scene.toLowerCase())
+  );
+
+  if (!sceneName) {
+    throw new Error(`Scene "${targetScene}" not found`);
+  }
+
+  await desktopObs.call('SetCurrentProgramScene', { sceneName });
+  return { success: true, message: `Switched to ${sceneName}` };
+}
+
+async function desktopSetMute(target, muted) {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const input = await findDesktopInput(target);
+  if (!input) {
+    throw new Error(`Audio source "${target}" not found`);
+  }
+
+  await desktopObs.call('SetInputMute', {
+    inputName: input.inputName,
+    inputMuted: muted
+  });
+  return { success: true, message: `${input.inputName} ${muted ? 'muted' : 'unmuted'}` };
+}
+
+async function desktopTakeScreenshot() {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const { currentScene } = await getDesktopSceneState();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  await desktopObs.call('SaveSourceScreenshot', {
+    sourceName: currentScene,
+    imageFormat: 'png',
+    imageFilePath: `screenshot_${timestamp}.png`
+  });
+  return { success: true, message: 'Screenshot saved' };
+}
+
+async function desktopStartRecording() {
+  const { outputActive } = await desktopObs.call('GetRecordStatus');
+  if (outputActive) {
+    return { success: false, message: 'Already recording' };
+  }
+  await desktopObs.call('StartRecord');
+  return { success: true, message: 'Recording started' };
+}
+
+async function desktopStartStreaming() {
+  const { outputActive } = await desktopObs.call('GetStreamStatus');
+  if (outputActive) {
+    return { success: false, message: 'Already streaming' };
+  }
+  await desktopObs.call('StartStream');
+  return { success: true, message: 'Stream started' };
+}
+
+async function executeDesktopCommand(command) {
+  const normalized = String(command || '').trim().toLowerCase();
+  let result;
+
+  if (!normalized) {
+    throw new Error('Command is required');
+  }
+
+  if (normalized.startsWith('switch to ')) {
+    result = await desktopSwitchToScene(normalized.replace(/^switch to\s+/, ''));
+  } else if (normalized === 'start recording') {
+    result = await desktopStartRecording();
+  } else if (normalized === 'start streaming') {
+    result = await desktopStartStreaming();
+  } else if (normalized === 'mute mic' || normalized === 'mute my mic') {
+    result = await desktopSetMute('mic', true);
+  } else if (normalized === 'unmute mic' || normalized === 'unmute my mic') {
+    result = await desktopSetMute('mic', false);
+  } else if (normalized === 'take screenshot') {
+    result = await desktopTakeScreenshot();
+  } else if (normalized === 'emergency mute') {
+    await desktopSetMute('mic', true);
+    try {
+      await desktopSwitchToScene('brb');
+    } catch (_error) {}
+    result = { success: true, message: 'Emergency mute activated' };
+  } else if (normalized === 'stream starting setup') {
+    result = await desktopSwitchToScene('starting');
+    result.message = 'Stream starting setup triggered';
+  } else if (normalized === 'raid mode') {
+    result = await desktopSwitchToScene('raid');
+    result.message = 'Raid mode activated';
+  } else if (normalized === 'subscriber celebration') {
+    result = { success: true, message: 'Subscriber celebration triggered' };
+  } else {
+    throw new Error(`Command "${normalized}" is not supported yet in desktop mode`);
+  }
+
+  pushDesktopCommandHistory({
+    command: normalized,
+    result: result.success ? 'success' : 'error',
+    message: result.message
+  });
+
+  return result;
 }
 
 async function connectDesktopObs() {
@@ -649,6 +790,10 @@ ipcMain.handle('desktop-get-health', () => {
   return getDesktopHealthStatus();
 });
 
+ipcMain.handle('desktop-get-command-history', () => {
+  return desktopCommandHistory;
+});
+
 ipcMain.handle('desktop-get-obs-settings', () => {
   return { ...desktopObsState.settings };
 });
@@ -685,6 +830,22 @@ ipcMain.handle('desktop-test-obs-connection', async () => {
       obsWebSocketVersion: version.obsWebSocketVersion
     };
   } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+ipcMain.handle('desktop-execute-command', async (_event, command) => {
+  try {
+    return await executeDesktopCommand(command);
+  } catch (error) {
+    pushDesktopCommandHistory({
+      command,
+      result: 'error',
+      message: error.message
+    });
     return {
       success: false,
       error: error.message

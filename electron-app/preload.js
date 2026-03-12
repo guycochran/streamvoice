@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // OBS connection
     checkOBSConnection: () => ipcRenderer.invoke('check-obs-connection'),
+    desktopExecuteCommand: (command) => ipcRenderer.invoke('desktop-execute-command', command),
+    desktopGetCommandHistory: () => ipcRenderer.invoke('desktop-get-command-history'),
     desktopGetHealth: () => ipcRenderer.invoke('desktop-get-health'),
     desktopGetObsSettings: () => ipcRenderer.invoke('desktop-get-obs-settings'),
     desktopGetStatus: () => ipcRenderer.invoke('desktop-get-status'),
