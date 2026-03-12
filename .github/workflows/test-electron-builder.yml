@@ -1,0 +1,52 @@
+name: Test Electron Builder
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Create minimal test
+      run: |
+        mkdir test-app
+        cd test-app
+
+        # Create minimal package.json
+        @'
+        {
+          "name": "test-app",
+          "version": "1.0.0",
+          "main": "index.js",
+          "build": {
+            "appId": "com.test.app"
+          }
+        }
+        '@ | Out-File -Encoding UTF8 package.json
+
+        # Create minimal index.js
+        @'
+        const { app } = require("electron");
+        app.on("ready", () => {
+          console.log("App ready");
+          app.quit();
+        });
+        '@ | Out-File -Encoding UTF8 index.js
+
+        # Install dependencies
+        npm install electron electron-builder --save-dev
+
+        # Try to build
+        npx electron-builder --win --dir
+
+        # Check output
+        dir

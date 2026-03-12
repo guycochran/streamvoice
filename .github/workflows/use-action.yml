@@ -1,0 +1,21 @@
+name: Use Action
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build with action
+      uses: samuelmeuli/action-electron-builder@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        package_root: electron-app
+        skip_build: false
+        args: "--win"
