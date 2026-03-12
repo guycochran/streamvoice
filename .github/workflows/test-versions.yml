@@ -1,0 +1,61 @@
+name: Test Versions
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Test with older versions
+      working-directory: electron-app
+      continue-on-error: true
+      run: |
+        # Back up original
+        Copy-Item package.json package.json.original
+
+        # Create package.json with older versions
+        @'
+        {
+          "name": "streamvoice",
+          "version": "1.0.0",
+          "main": "main.js",
+          "scripts": {
+            "build": "electron-builder"
+          },
+          "devDependencies": {
+            "electron": "22.3.27",
+            "electron-builder": "23.6.0"
+          },
+          "build": {
+            "appId": "com.streamvoice.app",
+            "directories": {
+              "output": "dist"
+            }
+          }
+        }
+        '@ | Out-File -Encoding UTF8 package.json
+
+        echo "=== Installing older versions ==="
+        npm install
+
+        echo "=== Trying build with older versions ==="
+        npm run build -- --win --dir
+
+        echo "=== Restore and try newer but stable versions ==="
+        Copy-Item package.json.original package.json -Force
+
+        # Try with known stable versions
+        npm install electron@25.9.8 electron-builder@24.6.4 --save-dev --force
+
+        echo "=== Try with stable versions ==="
+        npx electron-builder --win --dir
