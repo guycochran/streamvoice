@@ -229,7 +229,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.3',
+          message: 'StreamVoice v1.1.0-alpha.4',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -464,6 +464,28 @@ async function getDesktopSceneState() {
   };
 }
 
+function normalizeDesktopName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function getSceneAliases(targetScene) {
+  const key = normalizeDesktopName(targetScene);
+  const aliasMap = {
+    starting: ['starting', 'start', 'starting soon', 'stream starting', 'intro'],
+    ending: ['ending', 'end', 'stream ending', 'outro', 'goodbye'],
+    brb: ['brb', 'break', 'be right back', 'intermission'],
+    raid: ['raid', 'raid mode'],
+    gameplay: ['gameplay', 'game', 'gaming'],
+    chatting: ['chatting', 'just chatting', 'chat'],
+    camera: ['camera', 'cam'],
+    desktop: ['desktop', 'screen']
+  };
+
+  return aliasMap[key] || [targetScene];
+}
+
 async function findDesktopInput(target) {
   const { inputs } = await desktopObs.call('GetInputList');
   return inputs.find((input) => input.inputName.toLowerCase().includes(target.toLowerCase()));
@@ -475,11 +497,15 @@ async function desktopSwitchToScene(targetScene) {
   }
 
   const { scenes } = await getDesktopSceneState();
-  const sceneName = scenes.find((scene) =>
-    scene.toLowerCase() === targetScene.toLowerCase() ||
-    scene.toLowerCase().includes(targetScene.toLowerCase()) ||
-    targetScene.toLowerCase().includes(scene.toLowerCase())
-  );
+  const aliases = getSceneAliases(targetScene).map(normalizeDesktopName);
+  const sceneName = scenes.find((scene) => {
+    const normalizedScene = normalizeDesktopName(scene);
+    return aliases.some((alias) =>
+      normalizedScene === alias ||
+      normalizedScene.includes(alias) ||
+      alias.includes(normalizedScene)
+    );
+  });
 
   if (!sceneName) {
     throw new Error(`Scene "${targetScene}" not found`);
@@ -584,19 +610,28 @@ async function executeDesktopCommand(command) {
     } catch (_error) {}
     result = { success: true, message: 'Emergency mute activated' };
   } else if (normalized === 'stream starting setup') {
-    result = await desktopSwitchToScene('starting');
-    result.message = 'Stream starting setup triggered';
+    try {
+      await desktopSwitchToScene('starting');
+    } catch (_error) {}
+    const streamResult = await desktopStartStreaming();
+    let recordResult = { success: false, message: 'Recording not started' };
+    try {
+      recordResult = await desktopStartRecording();
+    } catch (_error) {}
+    result = {
+      success: streamResult.success || recordResult.success,
+      message: `Stream starting setup triggered. ${streamResult.message}. ${recordResult.message}.`
+    };
   } else if (normalized === 'stream ending setup') {
     try {
       await desktopSwitchToScene('ending');
     } catch (_error) {}
-    try {
-      await desktopStopStreaming();
-    } catch (_error) {}
-    try {
-      await desktopStopRecording();
-    } catch (_error) {}
-    result = { success: true, message: 'Stream ending setup triggered' };
+    const stopStreamResult = await desktopStopStreaming().catch(() => ({ success: false, message: 'Stream stop failed' }));
+    const stopRecordResult = await desktopStopRecording().catch(() => ({ success: false, message: 'Recording stop failed' }));
+    result = {
+      success: stopStreamResult.success || stopRecordResult.success,
+      message: `Stream ending setup triggered. ${stopStreamResult.message}. ${stopRecordResult.message}.`
+    };
   } else if (normalized === 'raid mode') {
     result = await desktopSwitchToScene('raid');
     result.message = 'Raid mode activated';
