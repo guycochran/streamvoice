@@ -1,0 +1,26 @@
+name: Build Docker
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build in Docker
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/project \
+          electronuserland/builder:wine \
+          /bin/bash -c "cd /project/electron-app && npm install --force && npm run build-win"
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: StreamVoice-Docker
+        path: electron-app/dist/

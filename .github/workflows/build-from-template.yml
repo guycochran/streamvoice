@@ -1,0 +1,57 @@
+name: Build From Template
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Clone electron-quick-start
+      run: |
+        git clone https://github.com/electron/electron-quick-start temp-electron
+
+    - name: Copy our files
+      run: |
+        Copy-Item electron-app/main.js temp-electron/ -Force
+        Copy-Item electron-app/preload.js temp-electron/ -Force
+        Copy-Item -Path electron-app/renderer -Destination temp-electron/ -Recurse -Force
+        Copy-Item -Path electron-app/assets -Destination temp-electron/ -Recurse -Force
+
+    - name: Install in template
+      working-directory: temp-electron
+      run: |
+        npm install
+        npm install electron-builder --save-dev
+
+    - name: Add build config
+      working-directory: temp-electron
+      run: |
+        $pkg = Get-Content package.json | ConvertFrom-Json
+        $pkg | Add-Member -Name "build" -Value @{
+          appId = "com.streamvoice.app"
+          productName = "StreamVoice"
+          directories = @{ output = "dist" }
+          win = @{ target = "nsis" }
+        } -MemberType NoteProperty
+        $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+
+    - name: Build template
+      working-directory: temp-electron
+      run: npx electron-builder --win
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: StreamVoice-Template
+        path: temp-electron/dist/
