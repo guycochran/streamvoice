@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, dialog } = require('electron');
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
@@ -8,6 +9,7 @@ let mainWindow;
 let tray;
 let serverProcess;
 let obsSettingsFilePath;
+let backendLogFilePath;
 const LOCAL_API_PORT = '3030';
 const LOCAL_WS_PORT = '8090';
 const SERVER_BASE_URL_CANDIDATES = [
@@ -128,7 +130,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.15',
+          message: 'StreamVoice v1.0.16',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -159,7 +161,6 @@ function startBackendServer() {
   console.log('Starting backend server from:', serverPath);
 
   // Check if the server file exists
-  const fs = require('fs');
   if (!fs.existsSync(serverPath)) {
     console.error('Server file not found at:', serverPath);
     dialog.showErrorBox('Server Error', `Backend server not found at: ${serverPath}`);
@@ -180,6 +181,7 @@ function startBackendServer() {
   });
 
   serverProcess.stdout.on('data', (data) => {
+    appendBackendLog(`STDOUT ${data.toString()}`);
     console.log(`Server: ${data}`);
     // Send server logs to renderer for debugging
     if (mainWindow) {
@@ -188,6 +190,7 @@ function startBackendServer() {
   });
 
   serverProcess.stderr.on('data', (data) => {
+    appendBackendLog(`STDERR ${data.toString()}`);
     console.error(`Server Error: ${data}`);
     // Send server errors to renderer
     if (mainWindow) {
@@ -196,11 +199,13 @@ function startBackendServer() {
   });
 
   serverProcess.on('error', (error) => {
+    appendBackendLog(`PROCESS_ERROR ${error.message}`);
     console.error(`Server failed to start: ${error.message}`);
     dialog.showErrorBox('Server Error', `Failed to start backend server: ${error.message}`);
   });
 
   serverProcess.on('exit', (code, signal) => {
+    appendBackendLog(`PROCESS_EXIT code=${code} signal=${signal}`);
     console.log(`Server exited with code=${code} signal=${signal}`);
     if (code !== 0 && !app.isQuitting) {
       dialog.showErrorBox('Server Crashed', `Backend server exited unexpectedly with code ${code}`);
@@ -213,6 +218,15 @@ function startBackendServer() {
       mainWindow.webContents.send('server-started');
     }
   }, 2000);
+}
+
+function appendBackendLog(message) {
+  if (!backendLogFilePath) {
+    return;
+  }
+
+  const line = `[${new Date().toISOString()}] ${message.endsWith('\n') ? message : `${message}\n`}`;
+  fs.appendFile(backendLogFilePath, line, () => {});
 }
 
 async function resolveServerBaseUrl(forceRefresh = false) {
@@ -349,6 +363,8 @@ autoUpdater.on('update-downloaded', () => {
 // App event handlers
 app.whenReady().then(() => {
   obsSettingsFilePath = path.join(app.getPath('userData'), 'obs-settings.json');
+  backendLogFilePath = path.join(app.getPath('userData'), 'backend.log');
+  fs.writeFileSync(backendLogFilePath, '', { flag: 'a' });
   createWindow();
   createTray();
   startBackendServer();
@@ -391,6 +407,16 @@ ipcMain.handle('get-settings', () => {
 
 ipcMain.handle('get-server-base-url', async () => {
   return await resolveServerBaseUrl();
+});
+
+ipcMain.handle('get-backend-log-tail', async () => {
+  if (!backendLogFilePath || !fs.existsSync(backendLogFilePath)) {
+    return '';
+  }
+
+  const content = fs.readFileSync(backendLogFilePath, 'utf8');
+  const lines = content.trim().split('\n');
+  return lines.slice(-20).join('\n');
 });
 
 ipcMain.handle('save-settings', (event, settings) => {

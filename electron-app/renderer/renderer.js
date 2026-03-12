@@ -72,6 +72,21 @@ function setWebUIFeedback(message, isError = false) {
     webUIFeedback.style.color = isError ? '#ff8a8a' : '';
 }
 
+async function enrichFeedback(message) {
+    try {
+        const logTail = await window.electronAPI.getBackendLogTail();
+        if (!logTail) {
+            setWebUIFeedback(message, true);
+            return;
+        }
+
+        const lastLine = logTail.trim().split('\n').slice(-1)[0];
+        setWebUIFeedback(`${message} | Backend: ${lastLine}`, true);
+    } catch (error) {
+        setWebUIFeedback(message, true);
+    }
+}
+
 function showWebUI() {
     webUI.style.display = 'block';
     webUI.style.position = 'fixed';
@@ -89,7 +104,7 @@ async function initializeWebUI(forceRefresh = false) {
         }
     } catch (error) {
         webUIReady = false;
-        setWebUIFeedback(`Local backend unavailable: ${error.message}`, true);
+        await enrichFeedback(`Local backend unavailable: ${error.message}`);
         return;
     }
 
@@ -217,14 +232,14 @@ async function checkOBSStatus() {
         obsStatusText.textContent = connected ? 'Connected' : 'Not Connected';
 
         if (!connected && errorMessage) {
-            setWebUIFeedback(`OBS status: ${errorMessage}`, true);
+            await enrichFeedback(`OBS status: ${errorMessage}`);
         } else if (webUIReady) {
             setWebUIFeedback('');
         }
     } catch (error) {
         obsStatusDot.classList.remove('active');
         obsStatusText.textContent = 'Error';
-        setWebUIFeedback(`OBS status check failed: ${error.message}`, true);
+        await enrichFeedback(`OBS status check failed: ${error.message}`);
     }
 }
 
