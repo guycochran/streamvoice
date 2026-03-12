@@ -1,0 +1,55 @@
+name: Build Debug
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Debug and fix
+      working-directory: electron-app
+      continue-on-error: true
+      run: |
+        echo "=== Current directory structure ==="
+        dir
+
+        echo "`n=== Remove problematic directories ==="
+        if (Test-Path server) { Remove-Item -Recurse -Force server }
+        if (Test-Path web) { Remove-Item -Recurse -Force web }
+        if (Test-Path scripts) { Remove-Item -Recurse -Force scripts }
+        if (Test-Path renderer) { Remove-Item -Recurse -Force renderer }
+
+        echo "`n=== Clean install ==="
+        if (Test-Path package-lock.json) { Remove-Item package-lock.json }
+        if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
+        npm install
+
+        echo "`n=== Try build with minimal files ==="
+        npx electron-builder --win --dir
+
+        echo "`n=== Check output ==="
+        if (Test-Path dist) {
+          echo "Build succeeded! Contents:"
+          dir dist
+        } else {
+          echo "Build failed - no dist directory"
+        }
+
+    - name: Upload anything created
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: debug-output
+        path: |
+          electron-app/dist/
+          electron-app/*.log
