@@ -24,11 +24,18 @@ jobs:
 
     - name: Install dependencies
       working-directory: electron-app
-      run: npm ci --force
+      run: |
+        # Clean install without package-lock
+        if (Test-Path package-lock.json) {
+          Remove-Item package-lock.json
+        }
+        npm install
 
     - name: Build Electron app
       working-directory: electron-app
-      run: npm run build-win
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: npx electron-builder --win
 
     - name: Upload Windows artifacts
       uses: actions/upload-artifact@v3

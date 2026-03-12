@@ -20,17 +20,28 @@ jobs:
 
     - name: Install dependencies
       working-directory: electron-app
-      run: npm ci --force
+      run: |
+        # Remove package-lock for fresh install
+        if (Test-Path package-lock.json) {
+          Remove-Item package-lock.json
+        }
+
+        # Install dependencies
+        npm install
 
     - name: Build Windows installer
       working-directory: electron-app
-      run: npm run build-win
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: |
+        # Build with electron-builder (installer)
+        npx electron-builder --win
 
     - name: Upload installer
       uses: actions/upload-artifact@v3
       with:
         name: StreamVoice-Setup
-        path: electron-app/dist/StreamVoice-Setup-*.exe
+        path: electron-app/dist/*.exe
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
