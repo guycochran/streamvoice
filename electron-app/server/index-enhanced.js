@@ -42,7 +42,7 @@ let lastStateRefreshError = null;
 const systemHealth = {
   app: {
     status: 'healthy',
-    version: '1.0.5',
+    version: '1.0.6',
     startTime: Date.now(),
     pid: process.pid,
     lastError: null
@@ -904,7 +904,7 @@ app.get('/api/obs-status', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: '0.3.0',
+    version: systemHealth.app.version,
     obsConnected,
     features: ['obs-websocket', 'real-control', 'stream-deck-macros', 'advanced-audio']
   });
@@ -1073,7 +1073,7 @@ const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
   console.log(`StreamVoice API running on http://localhost:${PORT}`);
   console.log(`WebSocket server running on ws://localhost:8090`);
-  console.log(`\n✨ StreamVoice Enhanced Server v0.3.0 Ready!`);
+  console.log(`\n✨ StreamVoice Enhanced Server v${systemHealth.app.version} Ready!`);
   console.log(`📝 ${Object.keys(COMMAND_MAP).length} voice commands available`);
   console.log(`🎯 Features: Advanced OBS control, Stream Deck macros, Audio mixer, Transitions`);
   console.log(`\n⚡ Connecting to OBS WebSocket...`);

@@ -1,6 +1,6 @@
 {
   "name": "streamvoice",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Professional voice control for OBS Studio",
   "main": "main.js",
   "scripts": {
@@ -20,7 +20,9 @@
   "dependencies": {
     "express": "^4.18.2",
     "obs-websocket-js": "^5.0.5",
-    "electron-updater": "^6.1.7"
+    "electron-updater": "^6.1.7",
+    "ws": "^8.14.2",
+    "cors": "^2.8.5"
   },
   "build": {
     "appId": "com.streamvoice.app",

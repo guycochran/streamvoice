@@ -144,26 +144,56 @@ function createTray() {
 function startBackendServer() {
   const serverPath = path.join(__dirname, 'server', 'index-enhanced.js');
 
+  console.log('Starting backend server from:', serverPath);
+
+  // Check if the server file exists
+  const fs = require('fs');
+  if (!fs.existsSync(serverPath)) {
+    console.error('Server file not found at:', serverPath);
+    dialog.showErrorBox('Server Error', `Backend server not found at: ${serverPath}`);
+    return;
+  }
+
   // Use the Electron runtime as Node in packaged builds instead of relying on a system node binary.
   serverProcess = spawn(process.execPath, [serverPath], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
   });
 
   serverProcess.stdout.on('data', (data) => {
     console.log(`Server: ${data}`);
+    // Send server logs to renderer for debugging
+    if (mainWindow) {
+      mainWindow.webContents.send('server-log', data.toString());
+    }
   });
 
   serverProcess.stderr.on('data', (data) => {
     console.error(`Server Error: ${data}`);
+    // Send server errors to renderer
+    if (mainWindow) {
+      mainWindow.webContents.send('server-error', data.toString());
+    }
   });
 
   serverProcess.on('error', (error) => {
     console.error(`Server failed to start: ${error.message}`);
+    dialog.showErrorBox('Server Error', `Failed to start backend server: ${error.message}`);
   });
 
   serverProcess.on('exit', (code, signal) => {
     console.log(`Server exited with code=${code} signal=${signal}`);
+    if (code !== 0 && !app.isQuitting) {
+      dialog.showErrorBox('Server Crashed', `Backend server exited unexpectedly with code ${code}`);
+    }
   });
+
+  // Give the server time to start
+  setTimeout(() => {
+    if (mainWindow) {
+      mainWindow.webContents.send('server-started');
+    }
+  }, 2000);
 }
 
 function checkForUpdates() {
