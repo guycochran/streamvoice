@@ -15,8 +15,15 @@ const wss = new WebSocket.Server({ port: 8090 });
 const obs = new OBSWebSocket();
 
 // Configuration
-const OBS_WEBSOCKET_URL = 'ws://127.0.0.1:4455'; // Force IPv4 connection
-const OBS_PASSWORD = ''; // Set this if you have a password
+let OBS_WEBSOCKET_URL = 'ws://127.0.0.1:4455'; // Force IPv4 connection
+let OBS_PASSWORD = ''; // Set this if you have a password
+
+// Settings storage (in production, use a proper database or file storage)
+let obsSettings = {
+  host: '127.0.0.1',
+  port: 4455,
+  password: ''
+};
 
 // Connection state
 let obsConnected = false;
@@ -31,12 +38,67 @@ let obsProfiles = [];
 let lastObsError = null;
 let lastStateRefreshError = null;
 
+// System health model
+const systemHealth = {
+  app: {
+    status: 'healthy',
+    version: '1.0.5',
+    startTime: Date.now(),
+    pid: process.pid,
+    lastError: null
+  },
+  backend: {
+    status: 'healthy', // healthy, degraded, failed
+    httpApi: {
+      port: process.env.PORT || 3030,
+      status: 'healthy',
+      lastError: null
+    },
+    webSocket: {
+      port: 8090,
+      status: 'healthy',
+      clients: 0,
+      lastError: null
+    }
+  },
+  obs: {
+    status: 'disconnected', // connected, disconnected, connecting, error
+    url: OBS_WEBSOCKET_URL,
+    lastError: null,
+    lastSuccessfulConnection: null,
+    reconnectAttempts: 0,
+    connected: false
+  },
+  speech: {
+    status: 'unknown', // available, unavailable, unknown
+    engine: 'WebSpeechAPI',
+    supported: null
+  },
+  microphone: {
+    status: 'unknown', // available, unavailable, permission_denied, unknown
+    lastError: null
+  }
+};
+
 // Connect to OBS
 async function connectToOBS() {
   try {
+    systemHealth.obs.status = 'connecting';
+    systemHealth.obs.reconnectAttempts++;
+
+    // Update URL from settings
+    OBS_WEBSOCKET_URL = `ws://${obsSettings.host}:${obsSettings.port}`;
+    OBS_PASSWORD = obsSettings.password;
+
     await obs.connect(OBS_WEBSOCKET_URL, OBS_PASSWORD);
     obsConnected = true;
     lastObsError = null;
+
+    systemHealth.obs.status = 'connected';
+    systemHealth.obs.connected = true;
+    systemHealth.obs.lastError = null;
+    systemHealth.obs.lastSuccessfulConnection = Date.now();
+
     console.log('✅ Connected to OBS WebSocket');
 
     // Get initial state
@@ -56,6 +118,11 @@ async function connectToOBS() {
     console.error('❌ Failed to connect to OBS:', error.message);
     obsConnected = false;
     lastObsError = error.message;
+
+    systemHealth.obs.status = 'error';
+    systemHealth.obs.connected = false;
+    systemHealth.obs.lastError = error.message;
+
     setTimeout(connectToOBS, 5000); // Retry in 5 seconds
   }
 }
@@ -108,8 +175,37 @@ function getDebugStatus() {
     lastObsError,
     lastStateRefreshError,
     pid: process.pid,
-    uptimeSeconds: Math.round(process.uptime())
+    uptimeSeconds: Math.round(process.uptime()),
+    systemHealth: systemHealth
   };
+}
+
+function getHealthStatus() {
+  // Update dynamic health indicators
+  systemHealth.backend.webSocket.clients = wss.clients.size;
+  systemHealth.obs.connected = obsConnected;
+
+  return {
+    status: determineOverallHealth(),
+    uptime: Date.now() - systemHealth.app.startTime,
+    subsystems: systemHealth
+  };
+}
+
+function determineOverallHealth() {
+  // If any critical system is failed, overall is failed
+  if (systemHealth.backend.status === 'failed' ||
+      systemHealth.obs.status === 'error') {
+    return 'failed';
+  }
+
+  // If OBS is disconnected or any system is degraded, overall is degraded
+  if (systemHealth.obs.status === 'disconnected' ||
+      systemHealth.backend.status === 'degraded') {
+    return 'degraded';
+  }
+
+  return 'healthy';
 }
 
 // Broadcast message to all connected clients
@@ -125,6 +221,10 @@ function broadcastToClients(message) {
 obs.on('ConnectionClosed', () => {
   console.log('❌ OBS connection closed');
   obsConnected = false;
+
+  systemHealth.obs.status = 'disconnected';
+  systemHealth.obs.connected = false;
+
   broadcastToClients({ type: 'obs_disconnected' });
   setTimeout(connectToOBS, 5000); // Attempt reconnection
 });
@@ -694,6 +794,8 @@ function calculateSimilarity(str1, str2) {
 wss.on('connection', (ws) => {
   console.log('🔌 StreamVoice client connected');
 
+  systemHealth.backend.webSocket.clients = wss.clients.size;
+
   ws.send(JSON.stringify({
     type: 'connected',
     message: 'StreamVoice Enhanced ready!',
@@ -745,6 +847,14 @@ wss.on('connection', (ws) => {
             suggestions: findSuggestions(message.text)
           }));
         }
+      } else if (message.type === 'update_health') {
+        // Update subsystem health status
+        if (message.subsystem === 'microphone') {
+          systemHealth.microphone.status = message.status;
+        } else if (message.subsystem === 'speech') {
+          systemHealth.speech.status = message.status;
+        }
+        console.log(`📊 Health update: ${message.subsystem} is ${message.status}`);
       } else if (message.type === 'get_status') {
         // Send current OBS status
         ws.send(JSON.stringify({
@@ -765,6 +875,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('👋 Client disconnected');
+    systemHealth.backend.webSocket.clients = wss.clients.size;
   });
 });
 
@@ -800,10 +911,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    connected: obsConnected
-  });
+  res.json(getHealthStatus());
 });
 
 app.get('/api/debug/status', (req, res) => {
@@ -883,6 +991,82 @@ async function handleExecuteRequest(req, res) {
 app.post('/execute', handleExecuteRequest);
 app.post('/api/command', handleExecuteRequest);
 app.post('/api/execute', handleExecuteRequest);
+
+// Settings endpoints
+app.get('/api/settings/obs', (req, res) => {
+  res.json(obsSettings);
+});
+
+app.post('/api/settings/obs', async (req, res) => {
+  const { host, port, password } = req.body;
+
+  // Validate input
+  if (!host || !port || isNaN(port) || port < 1 || port > 65535) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid host or port'
+    });
+  }
+
+  // Update settings
+  obsSettings = {
+    host: host || 'localhost',
+    port: parseInt(port) || 4455,
+    password: password || ''
+  };
+
+  console.log('📝 OBS settings updated:', obsSettings);
+
+  // Disconnect from current connection if any
+  if (obsConnected) {
+    try {
+      await obs.disconnect();
+      console.log('📴 Disconnected from old OBS connection');
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+    }
+  }
+
+  // Attempt to reconnect with new settings
+  setTimeout(() => {
+    console.log('🔄 Reconnecting with new settings...');
+    connectToOBS();
+  }, 1000);
+
+  res.json({ success: true, message: 'Settings saved successfully' });
+});
+
+// OBS connection test endpoint
+app.post('/api/obs/test-connection', async (req, res) => {
+  try {
+    // Create a test connection
+    const testObs = new OBSWebSocket();
+    const testUrl = `ws://${obsSettings.host}:${obsSettings.port}`;
+
+    console.log('🧪 Testing OBS connection to:', testUrl);
+
+    await testObs.connect(testUrl, obsSettings.password);
+
+    // Get version info
+    const versionInfo = await testObs.call('GetVersion');
+
+    // Disconnect test connection
+    await testObs.disconnect();
+
+    res.json({
+      success: true,
+      message: 'Successfully connected to OBS',
+      obsVersion: versionInfo.obsVersion,
+      obsWebSocketVersion: versionInfo.obsWebSocketVersion
+    });
+  } catch (error) {
+    console.error('❌ OBS connection test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to connect to OBS'
+    });
+  }
+});
 
 // Start servers
 const PORT = process.env.PORT || 3030;

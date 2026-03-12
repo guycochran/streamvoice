@@ -14,6 +14,7 @@ class StreamVoiceEnhanced {
         this.lastApiError = null;
         this.lastWsError = null;
         this.debugStatus = null;
+        this.healthStatus = null;
 
         // DOM elements
         this.connectionStatus = document.getElementById('connection-status');
@@ -76,9 +77,25 @@ class StreamVoiceEnhanced {
 
     startStatusPolling() {
         this.refreshStatusFromApi();
+        this.refreshHealthStatus();
         this.statusPollInterval = setInterval(() => {
             this.refreshStatusFromApi();
+            this.refreshHealthStatus();
         }, 3000);
+    }
+
+    async refreshHealthStatus() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/health`);
+            if (!response.ok) {
+                throw new Error(`Health request failed with ${response.status}`);
+            }
+
+            this.healthStatus = await response.json();
+            this.renderHealthStatus();
+        } catch (error) {
+            console.error('Failed to refresh health status:', error);
+        }
     }
 
     async refreshStatusFromApi() {
@@ -194,6 +211,7 @@ class StreamVoiceEnhanced {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             this.showNotification('❌ Speech recognition not supported. Please use Chrome.', 'error');
             this.voiceButton.disabled = true;
+            this.updateSubsystemHealth('speech', 'unavailable');
             return;
         }
 
@@ -203,6 +221,12 @@ class StreamVoiceEnhanced {
         this.recognition.interimResults = true;
         this.recognition.lang = 'en-US';
 
+        // Speech is available
+        this.updateSubsystemHealth('speech', 'available');
+
+        // Check microphone permissions
+        this.checkMicrophonePermission();
+
         this.recognition.onresult = (event) => {
             const last = event.results.length - 1;
             const transcript = event.results[last][0].transcript;
@@ -211,7 +235,7 @@ class StreamVoiceEnhanced {
             this.transcript.style.color = event.results[last].isFinal ? '#fff' : '#95a5a6';
 
             if (event.results[last].isFinal) {
-                this.executeCommand(transcript.toLowerCase());
+                this.executeCommand(transcript.toLowerCase(), 'voice');
             }
         };
 
@@ -249,14 +273,14 @@ class StreamVoiceEnhanced {
         if (micVolume) {
             micVolume.addEventListener('change', (e) => {
                 const percent = e.target.value / 100;
-                this.executeCommand(`mic volume ${Math.round(percent * 100)} percent`);
+                this.executeCommand(`mic volume ${Math.round(percent * 100)} percent`, 'slider');
             });
         }
 
         if (desktopVolume) {
             desktopVolume.addEventListener('change', (e) => {
                 const percent = e.target.value / 100;
-                this.executeCommand(`desktop volume ${Math.round(percent * 100)} percent`);
+                this.executeCommand(`desktop volume ${Math.round(percent * 100)} percent`, 'slider');
             });
         }
     }
@@ -380,6 +404,71 @@ class StreamVoiceEnhanced {
         }
     }
 
+    renderHealthStatus() {
+        if (!this.healthStatus || !this.healthStatus.subsystems) return;
+
+        const health = this.healthStatus.subsystems;
+
+        // Update individual subsystem statuses in UI
+        const getStatusColor = (status) => {
+            switch (status) {
+                case 'healthy':
+                case 'connected':
+                case 'available':
+                    return '#2ecc71';
+                case 'degraded':
+                case 'connecting':
+                    return '#f39c12';
+                case 'failed':
+                case 'disconnected':
+                case 'error':
+                case 'unavailable':
+                    return '#e74c3c';
+                default:
+                    return '#95a5a6';
+            }
+        };
+
+        // Update microphone status if element exists
+        const micStatus = document.getElementById('mic-status');
+        if (micStatus && health.microphone) {
+            micStatus.textContent = health.microphone.status.toUpperCase();
+            micStatus.style.color = getStatusColor(health.microphone.status);
+        }
+
+        // Update speech engine status if element exists
+        const speechStatus = document.getElementById('speech-status');
+        if (speechStatus && health.speech) {
+            speechStatus.textContent = health.speech.status.toUpperCase();
+            speechStatus.style.color = getStatusColor(health.speech.status);
+        }
+
+        // Update detailed connection status
+        if (this.connectionDetails) {
+            const parts = [];
+
+            if (health.backend?.httpApi?.status === 'healthy') {
+                parts.push('HTTP API: ✓');
+            } else {
+                parts.push('HTTP API: ✗');
+            }
+
+            if (health.backend?.webSocket?.status === 'healthy') {
+                parts.push(`WS: ✓ (${health.backend.webSocket.clients} clients)`);
+            } else {
+                parts.push('WS: ✗');
+            }
+
+            if (health.obs?.status === 'connected') {
+                parts.push('OBS: ✓');
+            } else {
+                parts.push(`OBS: ${health.obs?.status || 'unknown'}`);
+            }
+
+            this.connectionDetails.textContent = parts.join(' | ');
+        }
+    }
+
     addToHistory(command) {
         const time = new Date().toLocaleTimeString();
         const li = document.createElement('li');
@@ -448,7 +537,7 @@ class StreamVoiceEnhanced {
                 const chip = document.createElement('button');
                 chip.className = 'command-chip';
                 chip.textContent = command;
-                chip.onclick = () => this.executeCommand(command);
+                chip.onclick = () => this.executeCommand(command, 'button');
                 commandsDiv.appendChild(chip);
             });
 
@@ -457,38 +546,375 @@ class StreamVoiceEnhanced {
         }
     }
 
-    async executeCommand(command) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                type: 'voice_command',
-                text: command
-            }));
-            this.addToHistory(command);
-        } else {
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/api/command`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ command })
-                });
-
-                const result = await response.json();
-                if (!response.ok || result.success === false) {
-                    throw new Error(result.error || result.message || `Command failed with ${response.status}`);
-                }
-
-                this.result.textContent = result.message || 'Command executed';
-                this.result.style.color = '#2ecc71';
-                this.addToHistory(command);
-                this.showNotification(`✅ ${result.message || 'Command executed'}`, 'success');
-                this.refreshStatusFromApi();
-            } catch (error) {
-                console.error('HTTP command execution failed:', error);
-                this.showNotification(error.message || 'Not connected to StreamVoice server!', 'error');
+    async checkMicrophonePermission() {
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                // Try to get microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Success - we have microphone access
+                stream.getTracks().forEach(track => track.stop()); // Stop the stream
+                this.updateSubsystemHealth('microphone', 'available');
+            } else {
+                this.updateSubsystemHealth('microphone', 'unavailable');
+            }
+        } catch (error) {
+            console.error('Microphone permission error:', error);
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                this.updateSubsystemHealth('microphone', 'permission_denied');
+                this.showNotification('🎤 Microphone permission needed for voice control', 'error');
+            } else {
+                this.updateSubsystemHealth('microphone', 'unavailable');
             }
         }
+    }
+
+    updateSubsystemHealth(subsystem, status) {
+        // Send status update to server if WebSocket is connected
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                type: 'update_health',
+                subsystem: subsystem,
+                status: status
+            }));
+        }
+
+        // Update local UI immediately
+        if (subsystem === 'microphone') {
+            const micStatus = document.getElementById('mic-status');
+            if (micStatus) {
+                micStatus.textContent = status.toUpperCase().replace('_', ' ');
+                micStatus.style.color = this.getHealthStatusColor(status);
+            }
+        } else if (subsystem === 'speech') {
+            const speechStatus = document.getElementById('speech-status');
+            if (speechStatus) {
+                speechStatus.textContent = status.toUpperCase();
+                speechStatus.style.color = this.getHealthStatusColor(status);
+            }
+        }
+    }
+
+    getHealthStatusColor(status) {
+        switch (status) {
+            case 'available':
+            case 'healthy':
+            case 'connected':
+                return '#2ecc71';
+            case 'permission_denied':
+            case 'degraded':
+                return '#f39c12';
+            case 'unavailable':
+            case 'failed':
+            case 'disconnected':
+            case 'error':
+                return '#e74c3c';
+            default:
+                return '#95a5a6';
+        }
+    }
+
+    async executeCommand(command, source = 'unknown') {
+        // Unified command dispatcher - all commands go through here
+        const commandData = {
+            command: command,
+            source: source, // 'voice', 'button', 'macro', 'direct'
+            timestamp: Date.now()
+        };
+
+        // Log command to history immediately
+        this.addToHistory(command);
+        this.logCommandActivity(commandData);
+
+        // Show immediate feedback
+        if (source === 'voice') {
+            this.transcript.textContent = `Recognized: "${command}"`;
+            this.transcript.style.color = '#2ecc71';
+        }
+
+        try {
+            let result;
+
+            // Try WebSocket first if available
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                result = await this.executeViaWebSocket(commandData);
+            } else {
+                // Fall back to HTTP
+                result = await this.executeViaHTTP(commandData);
+            }
+
+            // Handle result uniformly
+            this.handleCommandResult(result, commandData);
+
+            return result;
+        } catch (error) {
+            // Handle errors uniformly
+            this.handleCommandError(error, commandData);
+            throw error;
+        }
+    }
+
+    async executeViaWebSocket(commandData) {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Command timeout'));
+            }, 5000);
+
+            const messageHandler = (event) => {
+                const message = JSON.parse(event.data);
+
+                if (message.type === 'command_executed' || message.type === 'command_failed') {
+                    clearTimeout(timeout);
+                    this.ws.removeEventListener('message', messageHandler);
+
+                    if (message.type === 'command_executed') {
+                        resolve({
+                            success: message.success,
+                            message: message.message
+                        });
+                    } else {
+                        reject(new Error(message.error || 'Command failed'));
+                    }
+                }
+            };
+
+            this.ws.addEventListener('message', messageHandler);
+
+            this.ws.send(JSON.stringify({
+                type: 'voice_command',
+                text: commandData.command,
+                source: commandData.source
+            }));
+        });
+    }
+
+    async executeViaHTTP(commandData) {
+        const response = await fetch(`${this.apiBaseUrl}/api/command`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                command: commandData.command,
+                source: commandData.source
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || result.success === false) {
+            throw new Error(result.error || result.message || `Command failed with ${response.status}`);
+        }
+
+        return result;
+    }
+
+    handleCommandResult(result, commandData) {
+        // Update UI with result
+        this.result.textContent = result.message || 'Command executed';
+        this.result.style.color = '#2ecc71';
+
+        // Show notification
+        this.showNotification(`✅ ${result.message || 'Command executed'}`, 'success');
+
+        // Update command log with result
+        if (this.commandHistory && this.commandHistory.length > 0) {
+            const lastCommand = this.commandHistory[this.commandHistory.length - 1];
+            lastCommand.result = 'success';
+            lastCommand.message = result.message;
+        }
+
+        // Refresh status after successful command
+        this.refreshStatusFromApi();
+        this.updateDiagnosticsPanel();
+    }
+
+    handleCommandError(error, commandData) {
+        // Update UI with error
+        this.result.textContent = `Error: ${error.message}`;
+        this.result.style.color = '#e74c3c';
+
+        // Show notification
+        this.showNotification(`❌ ${error.message}`, 'error');
+
+        // Update command log with error
+        if (this.commandHistory && this.commandHistory.length > 0) {
+            const lastCommand = this.commandHistory[this.commandHistory.length - 1];
+            lastCommand.result = 'error';
+            lastCommand.error = error.message;
+        }
+
+        console.error('Command execution failed:', error);
+        this.updateDiagnosticsPanel();
+    }
+
+    logCommandActivity(commandData) {
+        // Initialize command history if needed
+        if (!this.commandHistory) {
+            this.commandHistory = [];
+        }
+
+        // Add to command history
+        this.commandHistory.push({
+            timestamp: commandData.timestamp,
+            source: commandData.source,
+            input: commandData.command,
+            action: commandData.command,
+            result: 'pending'
+        });
+
+        // Keep only last 50 commands
+        if (this.commandHistory.length > 50) {
+            this.commandHistory = this.commandHistory.slice(-50);
+        }
+
+        // Update diagnostics panel if visible
+        this.updateDiagnosticsPanel();
+    }
+
+    updateDiagnosticsPanel() {
+        // Update diagnostics panel if visible
+        const diagnosticsPanel = document.getElementById('diagnosticsPanel');
+        if (diagnosticsPanel && diagnosticsPanel.style.display !== 'none') {
+            this.renderHealthStatus();
+            this.renderCommandActivity();
+        }
+    }
+
+    renderCommandActivity() {
+        const commandList = document.getElementById('diagnostic-command-list');
+        if (!commandList || !this.commandHistory) return;
+
+        commandList.innerHTML = '';
+        const recentCommands = this.commandHistory.slice(-10).reverse();
+
+        recentCommands.forEach(cmd => {
+            const li = document.createElement('li');
+            const timestamp = new Date(cmd.timestamp).toLocaleTimeString();
+            const statusIcon = cmd.result === 'success' ? '✅' :
+                             cmd.result === 'error' ? '❌' : '⏳';
+
+            li.innerHTML = `
+                <span style="color: #666;">${timestamp}</span>
+                <span style="color: #9b59b6;">[${cmd.source}]</span>
+                ${cmd.input}
+                ${statusIcon}
+            `;
+            li.style.marginBottom = '5px';
+            commandList.appendChild(li);
+        });
+    }
+
+    generateDiagnosticReport() {
+        const now = new Date().toISOString();
+        const uptime = this.healthStatus?.app?.startTime
+            ? Math.floor((Date.now() - this.healthStatus.app.startTime) / 1000)
+            : 'unknown';
+
+        let report = `StreamVoice Diagnostic Report
+Generated: ${now}
+Version: ${this.healthStatus?.app?.version || 'unknown'}
+Uptime: ${uptime} seconds
+
+=== SYSTEM HEALTH ===
+Overall Status: ${this.healthStatus?.overall || 'unknown'}
+
+=== SUBSYSTEMS ===
+`;
+
+        // App status
+        const app = this.healthStatus?.app || {};
+        report += `\nApp Runtime:
+  Status: ${app.status || 'unknown'}
+  PID: ${app.pid || 'unknown'}
+  Last Error: ${app.lastError || 'none'}
+`;
+
+        // Backend status
+        const backend = this.healthStatus?.backend || {};
+        report += `\nBackend Service:
+  Status: ${backend.status || 'unknown'}
+`;
+
+        // HTTP API
+        const httpApi = backend.httpApi || {};
+        report += `\nHTTP API:
+  Status: ${httpApi.status || 'unknown'}
+  Port: ${httpApi.port || 'unknown'}
+  Last Error: ${httpApi.lastError || 'none'}
+`;
+
+        // WebSocket
+        const ws = backend.webSocket || {};
+        report += `\nWebSocket Transport:
+  Status: ${ws.status || 'unknown'}
+  Port: ${ws.port || 'unknown'}
+  Connected Clients: ${ws.clients || 0}
+  Last Error: ${ws.lastError || 'none'}
+`;
+
+        // OBS
+        const obs = this.healthStatus?.obs || {};
+        report += `\nOBS Connection:
+  Status: ${obs.status || 'unknown'}
+  URL: ${obs.url || 'unknown'}
+  Connected: ${obs.connected ? 'Yes' : 'No'}
+  Reconnect Attempts: ${obs.reconnectAttempts || 0}
+  Last Successful Connection: ${obs.lastSuccessfulConnection || 'never'}
+  Last Error: ${obs.lastError || 'none'}
+`;
+
+        // Speech
+        const speech = this.healthStatus?.speech || {};
+        report += `\nSpeech Recognition:
+  Status: ${speech.status || 'unknown'}
+  Engine: ${speech.engine || 'unknown'}
+  Supported: ${speech.supported !== null ? (speech.supported ? 'Yes' : 'No') : 'unknown'}
+`;
+
+        // Microphone
+        const mic = this.healthStatus?.microphone || {};
+        report += `\nMicrophone:
+  Status: ${mic.status || 'unknown'}
+  Last Error: ${mic.lastError || 'none'}
+`;
+
+        // Recent commands from history
+        report += `\n=== RECENT COMMAND ACTIVITY ===\n`;
+        const historyItems = this.historyList?.children || [];
+        if (historyItems.length > 0) {
+            for (let i = 0; i < Math.min(10, historyItems.length); i++) {
+                const item = historyItems[i];
+                const time = item.querySelector('.time')?.textContent || '';
+                const command = item.querySelector('.command')?.textContent || '';
+                report += `${i + 1}. [${time}] ${command}\n`;
+            }
+        } else {
+            report += 'No recent commands\n';
+        }
+
+        // Connection details
+        report += `\n=== CONNECTION DETAILS ===
+Server URL: ${this.apiBaseUrl}
+WebSocket URL: ws://127.0.0.1:8090
+Server Reachable: ${this.serverReachable ? 'Yes' : 'No'}
+WebSocket Connected: ${this.wsConnected ? 'Yes' : 'No'}
+OBS Connected: ${this.obsConnected ? 'Yes' : 'No'}
+`;
+
+        // Errors
+        report += `\n=== RECENT ERRORS ===
+Last API Error: ${this.lastApiError || 'none'}
+Last WebSocket Error: ${this.lastWsError || 'none'}
+`;
+
+        // Environment
+        report += `\n=== ENVIRONMENT ===
+Platform: ${navigator.platform}
+User Agent: ${navigator.userAgent}
+Connection Type: ${this.wsConnected ? 'WebSocket' : (this.serverReachable ? 'HTTP Fallback' : 'Disconnected')}
+`;
+
+        return report;
     }
 }
 

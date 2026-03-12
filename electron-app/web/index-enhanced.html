@@ -198,6 +198,8 @@
                 <button class="tab" onclick="switchTab('commands')">All Commands</button>
                 <button class="tab" onclick="switchTab('audio')">Audio Mixer</button>
                 <button class="tab" onclick="switchTab('status')">OBS Status</button>
+                <button class="tab" onclick="switchTab('diagnostics')">Diagnostics</button>
+                <button class="tab" onclick="switchTab('settings')">Settings</button>
             </div>
 
             <!-- Voice Control Tab -->
@@ -323,11 +325,153 @@
                         <h5>Last Error</h5>
                         <div class="value" id="last-error">None</div>
                     </div>
+                    <div class="status-item">
+                        <h5>Microphone</h5>
+                        <div class="value" id="mic-status">UNKNOWN</div>
+                    </div>
+                    <div class="status-item">
+                        <h5>Speech Engine</h5>
+                        <div class="value" id="speech-status">UNKNOWN</div>
+                    </div>
                 </div>
                 <div id="scene-list" style="margin-top: 20px;">
                     <!-- Scene list will be populated here -->
                 </div>
                 <pre id="status-debug" style="margin-top: 20px; white-space: pre-wrap; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; color: #b9c0d0; font-size: 12px;">Loading diagnostics...</pre>
+            </div>
+
+            <!-- Diagnostics Tab -->
+            <div id="diagnostics-tab" class="tab-content">
+                <h3>Diagnostics Panel</h3>
+                <p style="color: #666; margin-bottom: 20px;">System health information for troubleshooting</p>
+
+                <div class="diagnostic-section">
+                    <h4>System Health Overview</h4>
+                    <div id="health-overview" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>Overall Status: <span id="overall-health-status" style="font-weight: bold;">Loading...</span></div>
+                            <div>Uptime: <span id="system-uptime">-</span></div>
+                            <div>Version: <span id="app-version">1.0.5</span></div>
+                            <div>Platform: <span id="platform">Electron</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="diagnostic-section">
+                    <h4>Subsystem Status</h4>
+                    <div id="subsystem-health" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <div class="status-item">
+                            <h5>Backend Service</h5>
+                            <div class="value" id="backend-health">UNKNOWN</div>
+                            <small id="backend-health-details" style="color: #666;"></small>
+                        </div>
+                        <div class="status-item">
+                            <h5>HTTP API</h5>
+                            <div class="value" id="http-api-health">UNKNOWN</div>
+                            <small>Port: <span id="http-api-port">3030</span></small>
+                        </div>
+                        <div class="status-item">
+                            <h5>WebSocket</h5>
+                            <div class="value" id="websocket-health">UNKNOWN</div>
+                            <small>Port: 8090, Clients: <span id="ws-health-clients">0</span></small>
+                        </div>
+                        <div class="status-item">
+                            <h5>OBS Connection</h5>
+                            <div class="value" id="obs-health">UNKNOWN</div>
+                            <small id="obs-health-details" style="color: #666;"></small>
+                        </div>
+                        <div class="status-item">
+                            <h5>Speech Engine</h5>
+                            <div class="value" id="speech-health">UNKNOWN</div>
+                            <small>Web Speech API</small>
+                        </div>
+                        <div class="status-item">
+                            <h5>Microphone</h5>
+                            <div class="value" id="mic-health">UNKNOWN</div>
+                            <small id="mic-health-details" style="color: #666;"></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="diagnostic-section">
+                    <h4>Recent Command Activity</h4>
+                    <div id="command-activity" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; margin-bottom: 20px; max-height: 200px; overflow-y: auto;">
+                        <ul id="diagnostic-command-list" style="list-style: none; padding: 0; margin: 0;">
+                            <!-- Commands will be added here -->
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="diagnostic-section">
+                    <h4>Connection Details</h4>
+                    <div id="connection-details" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                        <pre id="connection-info" style="margin: 0; color: #b9c0d0; font-size: 12px; white-space: pre-wrap;">Loading connection information...</pre>
+                    </div>
+                </div>
+
+                <div class="diagnostic-section" style="margin-top: 30px;">
+                    <button class="macro-button" onclick="copyDiagnosticReport()" style="background: #3498db;">
+                        📋 Copy Debug Report
+                    </button>
+                    <button class="macro-button" onclick="refreshDiagnostics()" style="background: #2ecc71; margin-left: 10px;">
+                        🔄 Refresh Diagnostics
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content">
+                <h3>Settings</h3>
+                <p style="color: #666; margin-bottom: 20px;">Configure StreamVoice and OBS connection settings</p>
+
+                <div class="settings-section">
+                    <h4>OBS WebSocket Connection</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label for="obs-host" style="display: block; margin-bottom: 5px; color: #9b59b6;">Host:</label>
+                            <input type="text" id="obs-host" placeholder="localhost" value="localhost" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label for="obs-port" style="display: block; margin-bottom: 5px; color: #9b59b6;">Port:</label>
+                            <input type="number" id="obs-port" placeholder="4455" value="4455" min="1" max="65535" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label for="obs-password" style="display: block; margin-bottom: 5px; color: #9b59b6;">Password (optional):</label>
+                            <input type="password" id="obs-password" placeholder="Leave blank if no password" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="macro-button" onclick="saveObsSettings()" style="background: #3498db; padding: 10px 20px;">
+                                💾 Save Settings
+                            </button>
+                            <button class="macro-button" onclick="testObsConnection()" style="background: #f39c12; padding: 10px 20px;">
+                                🔌 Test Connection
+                            </button>
+                        </div>
+                        <div id="settings-status" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;"></div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>Application Settings</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="auto-reconnect" checked style="margin-right: 10px;">
+                                <span>Auto-reconnect to OBS on disconnect</span>
+                            </label>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="show-notifications" checked style="margin-right: 10px;">
+                                <span>Show desktop notifications</span>
+                            </label>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label for="command-timeout" style="display: block; margin-bottom: 5px; color: #9b59b6;">Command Timeout (ms):</label>
+                            <input type="number" id="command-timeout" value="5000" min="1000" max="30000" step="1000" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
@@ -355,7 +499,7 @@
         // Execute command directly
         async function executeCommand(command) {
             if (window.streamVoice) {
-                await window.streamVoice.executeCommand(command);
+                await window.streamVoice.executeCommand(command, 'button');
             } else {
                 alert('StreamVoice UI is not ready yet.');
             }
@@ -381,6 +525,135 @@
         const script = document.createElement('script');
         script.src = 'app-enhanced.js';
         document.body.appendChild(script);
+
+        // Diagnostic functions
+        async function refreshDiagnostics() {
+            if (window.streamVoice && window.streamVoice.refreshHealthStatus) {
+                await window.streamVoice.refreshHealthStatus();
+                await window.streamVoice.refreshStatusFromApi();
+                alert('Diagnostics refreshed!');
+            }
+        }
+
+        async function copyDiagnosticReport() {
+            if (!window.streamVoice) {
+                alert('StreamVoice is not ready yet.');
+                return;
+            }
+
+            const report = window.streamVoice.generateDiagnosticReport();
+            if (report) {
+                try {
+                    await navigator.clipboard.writeText(report);
+                    alert('Diagnostic report copied to clipboard!');
+                } catch (err) {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = report;
+                    textArea.style.position = 'fixed';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert('Diagnostic report copied to clipboard!');
+                }
+            }
+        }
+
+        // Settings functions
+        async function saveObsSettings() {
+            const host = document.getElementById('obs-host').value || 'localhost';
+            const port = parseInt(document.getElementById('obs-port').value) || 4455;
+            const password = document.getElementById('obs-password').value || '';
+
+            const settings = {
+                host,
+                port,
+                password
+            };
+
+            try {
+                const response = await fetch('http://localhost:3030/api/settings/obs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                const result = await response.json();
+                const statusDiv = document.getElementById('settings-status');
+
+                if (response.ok && result.success) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = '#2ecc71';
+                    statusDiv.style.color = '#fff';
+                    statusDiv.textContent = '✅ Settings saved successfully! Reconnecting to OBS...';
+
+                    // Hide message after 3 seconds
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 3000);
+                } else {
+                    throw new Error(result.error || 'Failed to save settings');
+                }
+            } catch (error) {
+                const statusDiv = document.getElementById('settings-status');
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#e74c3c';
+                statusDiv.style.color = '#fff';
+                statusDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testObsConnection() {
+            const statusDiv = document.getElementById('settings-status');
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#3498db';
+            statusDiv.style.color = '#fff';
+            statusDiv.textContent = '🔄 Testing OBS connection...';
+
+            try {
+                const response = await fetch('http://localhost:3030/api/obs/test-connection', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    statusDiv.style.background = '#2ecc71';
+                    statusDiv.textContent = `✅ Connected to OBS! Version: ${result.obsVersion || 'Unknown'}`;
+                } else {
+                    throw new Error(result.error || 'Connection test failed');
+                }
+            } catch (error) {
+                statusDiv.style.background = '#e74c3c';
+                statusDiv.textContent = `❌ Failed to connect: ${error.message}`;
+            }
+        }
+
+        // Load settings on page load
+        async function loadObsSettings() {
+            try {
+                const response = await fetch('http://localhost:3030/api/settings/obs');
+                if (response.ok) {
+                    const settings = await response.json();
+                    if (settings) {
+                        document.getElementById('obs-host').value = settings.host || 'localhost';
+                        document.getElementById('obs-port').value = settings.port || 4455;
+                        document.getElementById('obs-password').value = settings.password || '';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load OBS settings:', error);
+            }
+        }
+
+        // Load settings when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            loadObsSettings();
+        });
     </script>
 </body>
 </html>
