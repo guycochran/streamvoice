@@ -35,3 +35,40 @@ The CI issue is resolved. The next work should move back to product tasks:
 - prepare the release and launch materials
 
 If a future CI failure appears, start from the fresh runner logs and do not resurrect the old directory-restructure theory without new evidence.
+
+## Latest App Fix
+A follow-up packaged app bug was fixed after CI went green.
+
+### Symptom
+- The built app launched but the status bar stayed on `OBS: Checking...`
+
+### Root Cause
+- The Electron app was trying to start the bundled backend with `node`, which fails on machines without Node installed on `PATH`
+- The Electron shell called `/api/obs-status` and `/api/command`, but the embedded server only exposed `/health`, `/commands`, and `/execute`
+
+### Fix Commit
+- `f58ac2e` `Fix packaged OBS status and command routing`
+
+### Files Changed
+1. `electron-app/main.js`
+2. `electron-app/server/index-enhanced.js`
+3. `electron-app/server/index.js`
+
+### What Changed
+- Switched backend launch from `spawn('node', ...)` to `spawn(process.execPath, ...)` with `ELECTRON_RUN_AS_NODE=1`
+- Added compatibility endpoints:
+  - `GET /api/obs-status`
+  - `GET /api/health`
+  - `POST /api/command`
+  - `POST /api/execute`
+
+### Required Next Step For Anyone Testing
+- pull latest `main`
+- rebuild the Electron app
+- launch the rebuilt app
+- verify the OBS label changes from `Checking...` to either `Connected` or `Not Connected`
+
+### Important Note
+- The app still expects OBS WebSocket on `ws://localhost:4455`
+- The current server code uses an empty OBS password
+- If OBS WebSocket authentication is enabled in OBS, the rebuilt app should now show `Not Connected` instead of hanging on `Checking...`
