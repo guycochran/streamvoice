@@ -350,6 +350,14 @@ function findSuggestions(input) {
 }
 
 // REST API endpoints
+app.get('/api/obs-status', (req, res) => {
+  res.json({
+    connected: obsConnected,
+    currentScene: obsCurrentScene,
+    scenes: obsScenes
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -367,7 +375,14 @@ app.get('/commands', (req, res) => {
   });
 });
 
-app.post('/execute', async (req, res) => {
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    connected: obsConnected
+  });
+});
+
+async function handleExecuteRequest(req, res) {
   const { command } = req.body;
   const match = findBestMatch(command);
 
@@ -385,7 +400,11 @@ app.post('/execute', async (req, res) => {
       suggestions: findSuggestions(command)
     });
   }
-});
+}
+
+app.post('/execute', handleExecuteRequest);
+app.post('/api/command', handleExecuteRequest);
+app.post('/api/execute', handleExecuteRequest);
 
 // Start servers
 const PORT = process.env.PORT || 3030;

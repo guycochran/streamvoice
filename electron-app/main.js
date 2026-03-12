@@ -6,6 +6,7 @@ const { autoUpdater } = require('electron-updater');
 let mainWindow;
 let tray;
 let serverProcess;
+const SERVER_BASE_URL = 'http://127.0.0.1:3030';
 
 // Enable live reload for Electron
 if (process.env.NODE_ENV === 'development') {
@@ -141,10 +142,10 @@ function createTray() {
 }
 
 function startBackendServer() {
-  // Start the Express server as a child process
   const serverPath = path.join(__dirname, 'server', 'index-enhanced.js');
 
-  serverProcess = spawn('node', [serverPath], {
+  // Use the Electron runtime as Node in packaged builds instead of relying on a system node binary.
+  serverProcess = spawn(process.execPath, [serverPath], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
   });
 
@@ -154,6 +155,14 @@ function startBackendServer() {
 
   serverProcess.stderr.on('data', (data) => {
     console.error(`Server Error: ${data}`);
+  });
+
+  serverProcess.on('error', (error) => {
+    console.error(`Server failed to start: ${error.message}`);
+  });
+
+  serverProcess.on('exit', (code, signal) => {
+    console.log(`Server exited with code=${code} signal=${signal}`);
   });
 }
 
@@ -243,26 +252,34 @@ ipcMain.handle('save-settings', (event, settings) => {
 });
 
 ipcMain.handle('check-obs-connection', async () => {
-  // This will be implemented by the server
   try {
-    const response = await fetch('http://localhost:3030/api/obs-status');
+    const response = await fetch(`${SERVER_BASE_URL}/api/obs-status`);
+    if (!response.ok) {
+      throw new Error(`OBS status request failed with ${response.status}`);
+    }
     return await response.json();
   } catch (error) {
-    return { connected: false };
+    return { connected: false, error: error.message };
   }
 });
 
 ipcMain.handle('voice-command', async (event, command) => {
-  // Send command to server
   try {
-    const response = await fetch('http://localhost:3030/api/command', {
+    const response = await fetch(`${SERVER_BASE_URL}/api/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command })
     });
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: errorPayload.error || `Voice command request failed with ${response.status}`
+      };
+    }
     return await response.json();
   } catch (error) {
-    return { error: error.message };
+    return { success: false, error: error.message };
   }
 });
 
