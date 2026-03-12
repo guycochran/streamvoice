@@ -38,12 +38,7 @@ jobs:
       working-directory: electron-app
       env:
         CSC_IDENTITY_AUTO_DISCOVERY: false
-      run: |
-        # List directory structure for debugging
-        Write-Host "=== Directory structure ==="
-        Get-ChildItem -Recurse -Depth 2
-        Write-Host "=== Starting build ==="
-        npx electron-builder --win --publish never --config.directories.buildResources=build
+      run: npx electron-builder --win --publish never
 
     - name: Upload Windows artifacts
       uses: actions/upload-artifact@v4
