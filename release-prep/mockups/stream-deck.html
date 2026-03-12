@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice - Stream Deck Alternative</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #252525;
+            padding: 16px 24px;
+            border-bottom: 1px solid #333;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2196F3;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #888;
+        }
+
+        .macro-grid {
+            padding: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 16px;
+        }
+
+        .macro-button {
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            text-align: center;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .macro-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+        }
+
+        .macro-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .macro-button .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .macro-button .label {
+            font-size: 14px;
+            line-height: 1.2;
+        }
+
+        /* Scene buttons */
+        .scene { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+
+        /* Recording buttons */
+        .recording { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+
+        /* Stream buttons */
+        .stream { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+
+        /* Audio buttons */
+        .audio { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+        /* Special buttons */
+        .special { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
+
+        /* Utility buttons */
+        .utility { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+
+        .macro-button.interview-mode {
+            grid-column: span 2;
+            background: linear-gradient(135deg, #f77062 0%, #fe5196 100%);
+        }
+
+        .macro-button.emergency {
+            background: linear-gradient(135deg, #ff0844 0%, #c51616 100%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #333;
+        }
+
+        .macro-button:hover .tooltip {
+            opacity: 1;
+        }
+
+        .hover-effect {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.1);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .macro-button:hover .hover-effect {
+            opacity: 1;
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #252525;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #333;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #888;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Stream Deck Alternative - One-Click Actions</h1>
+        <p>Click any button to execute instant macros • No $149 hardware required</p>
+    </div>
+
+    <div class="macro-grid">
+        <div class="grid-container">
+            <!-- Scene Controls -->
+            <button class="macro-button scene">
+                <span class="icon">🎮</span>
+                <span class="label">Gameplay</span>
+            </button>
+
+            <button class="macro-button scene">
+                <span class="icon">📷</span>
+                <span class="label">Camera</span>
+            </button>
+
+            <button class="macro-button scene">
+                <span class="icon">⏸️</span>
+                <span class="label">BRB</span>
+            </button>
+
+            <button class="macro-button scene">
+                <span class="icon">▶️</span>
+                <span class="label">Starting Soon</span>
+            </button>
+
+            <button class="macro-button scene">
+                <span class="icon">👋</span>
+                <span class="label">Ending</span>
+            </button>
+
+            <button class="macro-button scene">
+                <span class="icon">💬</span>
+                <span class="label">Just Chatting</span>
+            </button>
+
+            <!-- Recording Controls -->
+            <button class="macro-button recording">
+                <span class="icon">⏺️</span>
+                <span class="label">Start Recording</span>
+            </button>
+
+            <button class="macro-button recording">
+                <span class="icon">⏹️</span>
+                <span class="label">Stop Recording</span>
+            </button>
+
+            <!-- Stream Controls -->
+            <button class="macro-button stream">
+                <span class="icon">📡</span>
+                <span class="label">Go Live</span>
+            </button>
+
+            <button class="macro-button stream">
+                <span class="icon">🔴</span>
+                <span class="label">End Stream</span>
+            </button>
+
+            <!-- Audio Controls -->
+            <button class="macro-button audio">
+                <span class="icon">🎙️</span>
+                <span class="label">Mute Mic</span>
+            </button>
+
+            <button class="macro-button audio">
+                <span class="icon">🔊</span>
+                <span class="label">Mute Desktop</span>
+            </button>
+
+            <!-- Special Macros -->
+            <button class="macro-button interview-mode">
+                <span class="icon">🎬</span>
+                <span class="label">Interview Mode</span>
+                <div class="hover-effect"></div>
+                <div class="tooltip">Sets up split screen, adjusts audio, enables both cameras</div>
+            </button>
+
+            <button class="macro-button special">
+                <span class="icon">🎵</span>
+                <span class="label">Music Break</span>
+            </button>
+
+            <button class="macro-button special">
+                <span class="icon">📺</span>
+                <span class="label">Display Capture</span>
+            </button>
+
+            <button class="macro-button special">
+                <span class="icon">🎯</span>
+                <span class="label">Focus Mode</span>
+            </button>
+
+            <!-- Utility -->
+            <button class="macro-button utility">
+                <span class="icon">📸</span>
+                <span class="label">Screenshot</span>
+            </button>
+
+            <button class="macro-button utility">
+                <span class="icon">🔄</span>
+                <span class="label">Refresh Browser</span>
+            </button>
+
+            <button class="macro-button emergency">
+                <span class="icon">🚨</span>
+                <span class="label">EMERGENCY</span>
+            </button>
+
+            <button class="macro-button utility">
+                <span class="icon">⚙️</span>
+                <span class="label">Settings</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-indicator"></span>
+            <span>OBS Connected</span>
+        </div>
+        <div class="status-item">
+            <span>StreamVoice v1.0.0</span>
+        </div>
+        <div class="status-item">
+            <span>20 macros ready</span>
+        </div>
+    </div>
+</body>
+</html>

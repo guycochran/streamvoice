@@ -15,7 +15,7 @@ const wss = new WebSocket.Server({ port: 8090 });
 const obs = new OBSWebSocket();
 
 // Configuration
-const OBS_WEBSOCKET_URL = 'ws://localhost:4455'; // OBS WebSocket v5 default
+const OBS_WEBSOCKET_URL = 'ws://127.0.0.1:4455'; // Force IPv4 connection
 const OBS_PASSWORD = ''; // Set this if you have a password
 
 // Connection state

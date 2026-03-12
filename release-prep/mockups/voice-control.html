@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice Control Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #252525;
+            padding: 16px 24px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2196F3;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4CAF50;
+            font-size: 14px;
+        }
+
+        .status::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            gap: 24px;
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .voice-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .instructions {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid #2196F3;
+            border-radius: 8px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            font-size: 16px;
+            color: #90CAF9;
+        }
+
+        .mic-container {
+            position: relative;
+            margin-bottom: 32px;
+        }
+
+        .mic-button {
+            width: 160px;
+            height: 160px;
+            background: #2196F3;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(33, 150, 243, 0.3);
+        }
+
+        .mic-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 30px rgba(33, 150, 243, 0.5);
+        }
+
+        .mic-button.active {
+            background: #4CAF50;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
+            50% { box-shadow: 0 4px 40px rgba(76, 175, 80, 0.8); }
+            100% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
+        }
+
+        .mic-icon {
+            font-size: 64px;
+            color: white;
+        }
+
+        .transcript {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 16px 24px;
+            min-height: 60px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 16px;
+        }
+
+        .transcript-text {
+            font-size: 24px;
+            color: #ffffff;
+            font-weight: 300;
+        }
+
+        .status-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4CAF50;
+            border-radius: 6px;
+            color: #4CAF50;
+            font-size: 16px;
+        }
+
+        .commands-sidebar {
+            width: 320px;
+            background: #252525;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+
+        .commands-sidebar h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #2196F3;
+        }
+
+        .command-category {
+            margin-bottom: 20px;
+        }
+
+        .command-category h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .command-item {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 14px;
+            color: #ccc;
+            transition: background 0.2s;
+        }
+
+        .command-item:hover {
+            background: rgba(33, 150, 243, 0.2);
+            color: #ffffff;
+        }
+
+        .browser-chrome {
+            background: #e0e0e0;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .browser-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .browser-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .browser-button.red { background: #ff5f56; }
+        .browser-button.yellow { background: #ffbd2e; }
+        .browser-button.green { background: #27c93f; }
+
+        .url-bar {
+            flex: 1;
+            background: white;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="browser-chrome">
+        <div class="browser-buttons">
+            <div class="browser-button red"></div>
+            <div class="browser-button yellow"></div>
+            <div class="browser-button green"></div>
+        </div>
+        <div class="url-bar">localhost:3030</div>
+    </div>
+
+    <div class="header">
+        <h1>StreamVoice Control Interface</h1>
+        <div class="status">Connected to OBS Studio</div>
+    </div>
+
+    <div class="main-content">
+        <div class="voice-section">
+            <div class="instructions">
+                Hold SPACEBAR and speak your command
+            </div>
+
+            <div class="mic-container">
+                <button class="mic-button active">
+                    <span class="mic-icon">🎤</span>
+                </button>
+            </div>
+
+            <div class="transcript">
+                <div class="transcript-text">Switch to gameplay</div>
+            </div>
+
+            <div class="status-message">
+                ✓ Scene changed to: Gameplay
+            </div>
+        </div>
+
+        <div class="commands-sidebar">
+            <h2>Available Commands</h2>
+
+            <div class="command-category">
+                <h3>Scene Control</h3>
+                <div class="command-item">Switch to gameplay</div>
+                <div class="command-item">Switch to camera</div>
+                <div class="command-item">Switch to BRB</div>
+                <div class="command-item">Switch to starting</div>
+                <div class="command-item">Switch to ending</div>
+            </div>
+
+            <div class="command-category">
+                <h3>Recording & Streaming</h3>
+                <div class="command-item">Start recording</div>
+                <div class="command-item">Stop recording</div>
+                <div class="command-item">Start streaming</div>
+                <div class="command-item">Stop streaming</div>
+            </div>
+
+            <div class="command-category">
+                <h3>Audio Control</h3>
+                <div class="command-item">Mute microphone</div>
+                <div class="command-item">Unmute microphone</div>
+                <div class="command-item">Mute desktop</div>
+                <div class="command-item">Unmute desktop</div>
+            </div>
+
+            <div class="command-category">
+                <h3>Advanced</h3>
+                <div class="command-item">Take screenshot</div>
+                <div class="command-item">Enable studio mode</div>
+                <div class="command-item">Toggle virtual camera</div>
+                <div class="command-item">Emergency mode</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

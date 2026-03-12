@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice - Voice Control for OBS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .window {
+            width: 480px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .titlebar {
+            background: #2196F3;
+            color: white;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+
+        .titlebar h1 {
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .titlebar .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .titlebar .controls span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .minimize { background: #FFA500; }
+        .maximize { background: #90EE90; }
+        .close { background: #FF6B6B; }
+
+        .content {
+            padding: 24px;
+        }
+
+        .status-section {
+            margin-bottom: 24px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-icon.success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-text {
+            flex: 1;
+        }
+
+        .status-text .label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .status-text .value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .button-primary {
+            width: 100%;
+            padding: 14px 24px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 12px;
+        }
+
+        .button-primary:hover {
+            background: #1976D2;
+        }
+
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .checkbox-option input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .logo {
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .footer {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="window">
+        <div class="titlebar">
+            <h1>
+                <div class="logo">SV</div>
+                StreamVoice - Voice Control for OBS
+            </h1>
+            <div class="controls">
+                <span class="minimize"></span>
+                <span class="maximize"></span>
+                <span class="close"></span>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="status-section">
+                <div class="status-item">
+                    <div class="status-icon success">✓</div>
+                    <div class="status-text">
+                        <div class="label">OBS Connection</div>
+                        <div class="value">Connected to OBS Studio</div>
+                    </div>
+                </div>
+
+                <div class="status-item">
+                    <div class="status-icon success">✓</div>
+                    <div class="status-text">
+                        <div class="label">API Server</div>
+                        <div class="value">Running on port 3030</div>
+                    </div>
+                </div>
+
+                <div class="status-item">
+                    <div class="status-icon success">✓</div>
+                    <div class="status-text">
+                        <div class="label">WebSocket Server</div>
+                        <div class="value">Active on port 8090</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="button-primary">Open Control Interface</button>
+
+            <div class="checkbox-option">
+                <input type="checkbox" id="minimize-tray" checked>
+                <label for="minimize-tray">Minimize to system tray when closed</label>
+            </div>
+
+            <div class="footer">
+                Version 1.0.0 • Built with ❤️ for streamers
+            </div>
+        </div>
+    </div>
+</body>
+</html>

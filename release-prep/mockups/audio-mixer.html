@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice - Audio Mixer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mixer-panel {
+            background: #252525;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .mixer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .mixer-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2196F3;
+        }
+
+        .reset-button {
+            background: #444;
+            border: none;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .reset-button:hover {
+            background: #555;
+        }
+
+        .master-control {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .master-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #FF9800;
+            min-width: 120px;
+        }
+
+        .channels {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .channel {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .channel-icon {
+            width: 48px;
+            height: 48px;
+            background: #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .channel-controls {
+            flex: 1;
+        }
+
+        .channel-name {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 12px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .volume-slider {
+            flex: 1;
+            position: relative;
+            height: 40px;
+            display: flex;
+            align-items: center;
+        }
+
+        .slider-track {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slider-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: #2196F3;
+            border-radius: 3px;
+            transition: width 0.2s;
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #2196F3;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .volume-level {
+            min-width: 60px;
+            text-align: center;
+            font-size: 14px;
+            color: #888;
+            background: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .level-meter {
+            width: 60px;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .level-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.1s;
+        }
+
+        .level-bar.low { background: #4CAF50; }
+        .level-bar.medium { background: #FF9800; }
+        .level-bar.high { background: #f44336; }
+
+        .mute-button {
+            background: #333;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #888;
+        }
+
+        .mute-button:hover {
+            background: #444;
+            color: #fff;
+        }
+
+        .mute-button.muted {
+            background: #f44336;
+            color: #fff;
+        }
+
+        .microphone { color: #4CAF50; }
+        .desktop { color: #2196F3; }
+        .game { color: #FF9800; }
+        .music { color: #9C27B0; }
+
+        /* Specific channel styles */
+        .channel.microphone .slider-fill,
+        .channel.microphone .slider-handle { background: #4CAF50; }
+
+        .channel.desktop .slider-fill,
+        .channel.desktop .slider-handle { background: #2196F3; }
+
+        .channel.game .slider-fill,
+        .channel.game .slider-handle { background: #FF9800; }
+
+        .channel.music .slider-fill,
+        .channel.music .slider-handle { background: #9C27B0; }
+    </style>
+</head>
+<body>
+    <div class="mixer-panel">
+        <div class="mixer-header">
+            <h1 class="mixer-title">Audio Mixer Control</h1>
+            <button class="reset-button">Reset All</button>
+        </div>
+
+        <div class="master-control">
+            <span class="master-label">Master Volume</span>
+            <div class="slider-container" style="flex: 1;">
+                <div class="volume-slider">
+                    <div class="slider-track">
+                        <div class="slider-fill" style="width: 85%;"></div>
+                    </div>
+                    <div class="slider-handle" style="left: 85%;"></div>
+                </div>
+                <div class="volume-level">85%</div>
+            </div>
+        </div>
+
+        <div class="channels">
+            <div class="channel microphone">
+                <div class="channel-icon">
+                    <span>🎙️</span>
+                </div>
+                <div class="channel-controls">
+                    <div class="channel-name">Microphone</div>
+                    <div class="slider-container">
+                        <div class="volume-slider">
+                            <div class="slider-track">
+                                <div class="slider-fill" style="width: 75%;"></div>
+                            </div>
+                            <div class="slider-handle" style="left: 75%;"></div>
+                        </div>
+                        <div class="volume-level">75%</div>
+                        <button class="mute-button">
+                            <span>🔇</span>
+                        </button>
+                    </div>
+                    <div class="level-meter" style="margin-top: 8px;">
+                        <div class="level-bar low" style="width: 65%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="channel desktop">
+                <div class="channel-icon">
+                    <span>🖥️</span>
+                </div>
+                <div class="channel-controls">
+                    <div class="channel-name">Desktop Audio</div>
+                    <div class="slider-container">
+                        <div class="volume-slider">
+                            <div class="slider-track">
+                                <div class="slider-fill" style="width: 50%;"></div>
+                            </div>
+                            <div class="slider-handle" style="left: 50%;"></div>
+                        </div>
+                        <div class="volume-level">50%</div>
+                        <button class="mute-button">
+                            <span>🔇</span>
+                        </button>
+                    </div>
+                    <div class="level-meter" style="margin-top: 8px;">
+                        <div class="level-bar low" style="width: 40%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="channel game">
+                <div class="channel-icon">
+                    <span>🎮</span>
+                </div>
+                <div class="channel-controls">
+                    <div class="channel-name">Game Audio</div>
+                    <div class="slider-container">
+                        <div class="volume-slider">
+                            <div class="slider-track">
+                                <div class="slider-fill" style="width: 80%;"></div>
+                            </div>
+                            <div class="slider-handle" style="left: 80%;"></div>
+                        </div>
+                        <div class="volume-level">80%</div>
+                        <button class="mute-button">
+                            <span>🔇</span>
+                        </button>
+                    </div>
+                    <div class="level-meter" style="margin-top: 8px;">
+                        <div class="level-bar medium" style="width: 85%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="channel music">
+                <div class="channel-icon">
+                    <span>🎵</span>
+                </div>
+                <div class="channel-controls">
+                    <div class="channel-name">Music</div>
+                    <div class="slider-container">
+                        <div class="volume-slider">
+                            <div class="slider-track">
+                                <div class="slider-fill" style="width: 20%;"></div>
+                            </div>
+                            <div class="slider-handle" style="left: 20%;"></div>
+                        </div>
+                        <div class="volume-level">20%</div>
+                        <button class="mute-button muted">
+                            <span>🔇</span>
+                        </button>
+                    </div>
+                    <div class="level-meter" style="margin-top: 8px;">
+                        <div class="level-bar low" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
