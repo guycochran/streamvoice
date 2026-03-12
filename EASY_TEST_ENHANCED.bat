@@ -1,129 +1,124 @@
 @echo off
 color 0A
-title StreamVoice Enhanced - Advanced Features!
+title StreamVoice Enhanced v0.3.0 - 70+ Commands!
 
 echo ========================================
 echo     STREAMVOICE ENHANCED v0.3.0
-echo     Advanced Voice Control for OBS
+echo     70+ Commands + Stream Deck Mode!
 echo ========================================
 echo.
-echo NEW FEATURES:
-echo - Stream Deck alternative (one-click macros)
-echo - Audio mixer with volume control
-echo - 70+ voice commands
-echo - Transition controls
-echo - Filter controls (green screen, blur)
-echo - Studio mode support
-echo - Screenshot and replay buffer
-echo.
 
-:: Check if we're in the right folder
+:: Check if we're in the right directory
 if not exist "server\index-enhanced.js" (
-    echo [ERROR] Enhanced version not found!
-    echo Please make sure you're in the StreamVoice folder.
+    echo [ERROR] Please run this file from the StreamVoice folder!
     echo.
+    echo Make sure you extracted the ZIP file first!
     pause
     exit
 )
 
 :: Check if Node.js is installed
+echo Checking for Node.js...
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!] Node.js not found!
+    echo [ERROR] Node.js not found!
     echo.
-    echo Opening Node.js download page...
-    start https://nodejs.org/
-    echo.
-    echo 1. Download and install Node.js (use defaults)
-    echo 2. Then run this file again
+    echo Please install Node.js first:
+    echo 1. Go to https://nodejs.org
+    echo 2. Download the LTS version
+    echo 3. Install it (use default settings)
+    echo 4. Run this file again
     echo.
     pause
     exit
 )
 
-echo [OK] Everything looks good!
+echo [OK] Node.js found!
 echo.
 
-:: Install dependencies if needed
+:: Check if node_modules exists (INSTALL.bat was run)
 if not exist "server\node_modules" (
-    echo First time setup - installing stuff (one time only)...
-    cd server
-    call npm install
-    cd ..
+    echo [!] Dependencies not installed. Running INSTALL.bat...
+    echo.
+    call INSTALL.bat
     echo.
 )
 
-:: Kill any existing StreamVoice servers
-taskkill /F /FI "WindowTitle eq StreamVoice*" >nul 2>&1
-taskkill /F /FI "WindowTitle eq Administrator:  StreamVoice*" >nul 2>&1
+:: Start OBS check
+echo Checking if OBS is running...
+tasklist /FI "IMAGENAME eq obs64.exe" 2>NUL | find /I /N "obs64.exe">NUL
+if "%ERRORLEVEL%"=="0" (
+    echo [OK] OBS is running!
+) else (
+    echo [!] OBS is not running. Please start OBS Studio first!
+    echo.
+    echo Would you like me to open OBS WebSocket setup instructions? (Y/N)
+    choice /C YN /N
+    if errorlevel 2 goto skip_obs_help
+    start https://github.com/guycochran/streamvoice#-obs-websocket-setup
+    :skip_obs_help
+)
+
+echo.
+echo Starting StreamVoice Enhanced server...
+echo.
 
 :: Start the enhanced server
-echo Starting StreamVoice Enhanced server...
 cd server
-start "StreamVoice Enhanced Server" cmd /k node index-enhanced.js
+start /B node index-enhanced.js
 
-:: Wait a bit for server to start
-timeout /t 3 /nobreak >nul
+:: Give server time to start
+timeout /t 2 /nobreak > nul
 
-:: Open the enhanced web interface
-cd ..\web
 echo.
 echo ========================================
-echo    OPENING STREAMVOICE ENHANCED...
+echo     SERVER STARTED SUCCESSFULLY!
 echo ========================================
+echo.
+echo Opening StreamVoice Enhanced in Chrome...
 echo.
 
 :: Try to find Chrome
-set chrome_path=
+set chrome_found=0
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
     set chrome_path="%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+    set chrome_found=1
 ) else if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
     set chrome_path="%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+    set chrome_found=1
 ) else if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" (
     set chrome_path="%LocalAppData%\Google\Chrome\Application\chrome.exe"
+    set chrome_found=1
 )
 
-if defined chrome_path (
-    start "" %chrome_path% --new-window "%cd%\index-enhanced.html"
+if %chrome_found%==1 (
+    :: Open the enhanced interface
+    %chrome_path% "http://localhost:3030/index-enhanced.html"
 ) else (
-    :: Fallback to default browser
-    start index-enhanced.html
+    echo [WARNING] Chrome not found in default location!
     echo.
-    echo [!] Chrome not found - opened in default browser
-    echo [!] Voice control only works in Chrome!
+    echo Please open Chrome manually and go to:
+    echo http://localhost:3030/index-enhanced.html
+    echo.
+    start http://localhost:3030/index-enhanced.html
 )
 
 echo.
 echo ========================================
-echo         ENHANCED FEATURES:
+echo     STREAMVOICE IS NOW RUNNING!
 echo ========================================
 echo.
-echo STREAM DECK MODE:
-echo - Click the "Stream Deck" tab
-echo - One-click macros for common actions
-echo - Start/end stream sequences
-echo - Emergency buttons
+echo QUICK START:
+echo 1. Allow microphone access in Chrome
+echo 2. Hold the mic button and say a command
+echo 3. Try: "Switch to gameplay"
 echo.
-echo AUDIO MIXER:
-echo - Click the "Audio Mixer" tab
-echo - Control volumes with sliders
-echo - Quick mute/unmute buttons
+echo NEW IN v0.3.0:
+echo - Click "Stream Deck" tab for one-click macros!
+echo - 70+ voice commands (see All Commands tab)
+echo - Audio mixer with volume sliders
 echo.
-echo NEW VOICE COMMANDS:
-echo - "Enable green screen"
-echo - "Set transition duration medium"
-echo - "Take screenshot"
-echo - "Increase mic volume"
-echo - "Enable studio mode"
-echo - And 50+ more!
+echo To stop: Close this window
 echo.
-echo ========================================
-echo.
-echo Press any key to stop StreamVoice Enhanced...
-pause >nul
-
-:: Kill the server
-taskkill /F /FI "WindowTitle eq StreamVoice Enhanced*" >nul 2>&1
-echo.
-echo StreamVoice Enhanced stopped. Thanks for testing the advanced features!
-timeout /t 3
+echo Enjoy controlling OBS with your voice!
+pause

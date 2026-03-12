@@ -27,9 +27,12 @@ if %errorlevel% neq 0 (
     echo Opening Node.js download page...
     start https://nodejs.org/
     echo.
+    echo IMPORTANT STEPS:
     echo 1. Download and install Node.js (use defaults)
-    echo 2. Then run this file again
+    echo 2. After installing Node.js, run INSTALL.bat (NOT this file)
+    echo 3. Then run EASY_TEST_ENHANCED.bat to start StreamVoice
     echo.
+    echo Press any key to open Node.js download page...
     pause
     exit
 )
