@@ -1,0 +1,77 @@
+name: Debug Error
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Debug electron-app directory
+      run: |
+        echo "=== Checking electron-app ==="
+        if (Test-Path electron-app) {
+          echo "✓ electron-app exists"
+          cd electron-app
+          echo "Contents:"
+          dir
+        } else {
+          echo "✗ electron-app NOT FOUND!"
+          echo "Root directory contents:"
+          dir
+        }
+
+    - name: Debug package.json
+      working-directory: electron-app
+      run: |
+        echo "=== package.json content ==="
+        Get-Content package.json
+        echo "`n=== Validating JSON ==="
+        try {
+          $json = Get-Content package.json | ConvertFrom-Json
+          echo "✓ Valid JSON"
+          echo "Name: $($json.name)"
+          echo "Version: $($json.version)"
+          echo "Main: $($json.main)"
+        } catch {
+          echo "✗ Invalid JSON!"
+          echo $_.Exception.Message
+        }
+
+    - name: Try simple npm commands
+      working-directory: electron-app
+      run: |
+        echo "=== npm version ==="
+        npm --version
+        echo "`n=== npm config ==="
+        npm config list
+        echo "`n=== npm init test ==="
+        npm init -y
+
+    - name: Install step by step
+      working-directory: electron-app
+      run: |
+        echo "=== Installing electron ==="
+        npm install electron --save-dev
+        if ($?) { echo "✓ Electron installed" } else { echo "✗ Electron failed" }
+
+        echo "`n=== Installing electron-builder ==="
+        npm install electron-builder --save-dev
+        if ($?) { echo "✓ Electron-builder installed" } else { echo "✗ Electron-builder failed" }
+
+    - name: Test electron
+      working-directory: electron-app
+      continue-on-error: true
+      run: |
+        echo "=== Testing electron ==="
+        npx electron --version
+        npx electron-builder --version
