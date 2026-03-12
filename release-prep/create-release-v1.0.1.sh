@@ -20,10 +20,10 @@ if [ ! -f "$RELEASE_NOTES_FILE" ]; then
 fi
 
 # Read GitHub token
-if [ -f "../.github_token" ]; then
-    GITHUB_TOKEN=$(cat ../.github_token)
+if [ -f ".github_token" ]; then
+    GITHUB_TOKEN=$(cat .github_token)
 else
-    echo "❌ Error: GitHub token not found at ../.github_token"
+    echo "❌ Error: GitHub token not found at .github_token"
     exit 1
 fi
 
