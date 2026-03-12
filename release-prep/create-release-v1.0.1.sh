@@ -11,7 +11,7 @@ echo "🚀 Creating StreamVoice v1.0.1 Release..."
 REPO="guycochran/streamvoice"
 TAG="v1.0.1"
 TITLE="StreamVoice v1.0.1 - OBS Connection Fix 🔧"
-RELEASE_NOTES_FILE="./RELEASE_NOTES_v1.0.1.md"
+RELEASE_NOTES_FILE="./release-prep/RELEASE_NOTES_v1.0.1.md"
 
 # Check if release notes exist
 if [ ! -f "$RELEASE_NOTES_FILE" ]; then
