@@ -7,6 +7,8 @@
 
 **Corrected diagnosis**: The current `electron-app` structure packages successfully. The active workflow issue was more likely deprecated GitHub Actions artifact steps.
 
+**Result**: The fix is now confirmed. GitHub Actions `Build Electron App` run `#41` for commit `59d0d3e849b30450056eb6fa5fac3376668b1408` completed successfully on March 12, 2026 at 13:17:45 UTC.
+
 ## What Was Verified
 - `npx electron-builder --dir` succeeds locally from `electron-app`
 - The packaged `app.asar` includes `server/`, `web/`, `renderer/`, and assets
@@ -27,4 +29,9 @@
 Do not move `electron-app/server`, `electron-app/web`, or `electron-app/renderer` out of the app just because of the earlier notes. That restructuring is not supported by the current evidence and would create unnecessary runtime risk.
 
 ## Next Step
-Push the workflow changes and inspect the next GitHub Actions run. If a failure remains, use that fresh runner log as the source of truth rather than the older restructuring hypothesis.
+The CI issue is resolved. The next work should move back to product tasks:
+- test the generated Windows installer on a clean machine
+- capture polished screenshots
+- prepare the release and launch materials
+
+If a future CI failure appears, start from the fresh runner logs and do not resurrect the old directory-restructure theory without new evidence.
