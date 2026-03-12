@@ -26,17 +26,11 @@ jobs:
     - name: Install Python dependencies
       run: pip install Pillow
 
-    - name: Cache node modules
-      uses: actions/cache@v3
-      with:
-        path: electron-app/node_modules
-        key: ${{ runner.os }}-node-${{ hashFiles('electron-app/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-
     - name: Install dependencies
       working-directory: electron-app
-      run: npm install
+      run: |
+        npm install --force
+        npm install electron-builder --save-dev
 
     - name: Generate icons
       working-directory: electron-app
