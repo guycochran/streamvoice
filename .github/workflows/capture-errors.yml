@@ -1,0 +1,54 @@
+name: Capture Errors
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Try npm install and capture errors
+      working-directory: electron-app
+      continue-on-error: true
+      run: |
+        echo "=== Attempting npm install ==="
+        npm install 2>&1 | Tee-Object npm-install.log
+        $exitCode = $LASTEXITCODE
+        echo "Exit code: $exitCode"
+        echo "=== npm install log ==="
+        Get-Content npm-install.log
+        if ($exitCode -ne 0) {
+          echo "=== npm error log ==="
+          if (Test-Path npm-debug.log) {
+            Get-Content npm-debug.log
+          }
+        }
+
+    - name: Try build and capture errors
+      working-directory: electron-app
+      continue-on-error: true
+      run: |
+        echo "=== Attempting build ==="
+        npm run build-win -- --publish never 2>&1 | Tee-Object build.log
+        $exitCode = $LASTEXITCODE
+        echo "Exit code: $exitCode"
+        echo "=== Build log ==="
+        Get-Content build.log
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: error-logs
+        path: |
+          electron-app/*.log
+          electron-app/npm-debug.log

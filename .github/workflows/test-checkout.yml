@@ -1,0 +1,23 @@
+name: Test Checkout
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: List files
+      run: |
+        echo "=== Root directory ==="
+        ls -la
+        echo "=== electron-app directory ==="
+        ls -la electron-app/
+        echo "=== Check package.json ==="
+        cat electron-app/package.json
