@@ -57,7 +57,11 @@ function createWindow() {
     title: 'StreamVoice'
   });
 
-  loadStartupScreen('Starting StreamVoice...', 'Launching local backend and connecting to OBS.');
+  mainWindow.loadFile(path.join(__dirname, 'web', 'index-enhanced.html'));
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    checkForUpdates();
+  });
 
   // Minimize to tray instead of closing
   mainWindow.on('close', (event) => {
@@ -154,34 +158,6 @@ function loadStartupScreen(title, detail) {
   mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 
-async function loadEnhancedApp(maxAttempts = 30) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    for (const baseUrl of SERVER_BASE_URL_CANDIDATES) {
-      try {
-        await mainWindow.loadURL(`${baseUrl}/index-enhanced.html`);
-        resolvedServerBaseUrl = baseUrl;
-        mainWindow.show();
-        checkForUpdates();
-        return;
-      } catch (error) {
-        // Try the next candidate.
-      }
-    }
-
-    loadStartupScreen(
-      'Starting StreamVoice...',
-      `Waiting for local services (${attempt}/${maxAttempts}).`
-    );
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  loadStartupScreen(
-    'StreamVoice Could Not Start',
-    'The local backend did not become reachable. Restart the app and check the packaged backend log.'
-  );
-  mainWindow.show();
-}
-
 function getBackendLogTailSync() {
   if (!backendLogFilePath || !fs.existsSync(backendLogFilePath)) {
     return '';
@@ -234,7 +210,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.18',
+          message: 'StreamVoice v1.0.19',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -317,8 +293,8 @@ function startBackendServer() {
   });
 
   setTimeout(() => {
-    if (mainWindow) {
-      loadEnhancedApp();
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
     }
   }, 500);
 }

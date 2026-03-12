@@ -562,6 +562,14 @@
         }
 
         // Settings functions
+        function getApiBaseUrl() {
+            if (window.location.protocol === 'file:') {
+                return 'http://127.0.0.1:3030';
+            }
+
+            return '';
+        }
+
         async function saveObsSettings() {
             const host = document.getElementById('obs-host').value || '127.0.0.1';
             const port = parseInt(document.getElementById('obs-port').value) || 4455;
@@ -574,7 +582,7 @@
             };
 
             try {
-                const response = await fetch('/api/settings/obs', {
+                const response = await fetch(`${getApiBaseUrl()}/api/settings/obs`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -615,7 +623,7 @@
             statusDiv.textContent = '🔄 Testing OBS connection...';
 
             try {
-                const response = await fetch('/api/obs/test-connection', {
+                const response = await fetch(`${getApiBaseUrl()}/api/obs/test-connection`, {
                     method: 'POST'
                 });
 
@@ -636,7 +644,7 @@
         // Load settings on page load
         async function loadObsSettings() {
             try {
-                const response = await fetch('/api/settings/obs');
+                const response = await fetch(`${getApiBaseUrl()}/api/settings/obs`);
                 if (response.ok) {
                     const settings = await response.json();
                     if (settings) {
