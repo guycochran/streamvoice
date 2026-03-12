@@ -1,0 +1,43 @@
+{
+  "name": "streamvoice",
+  "version": "1.0.0",
+  "description": "Professional voice control for OBS Studio",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-win": "electron-builder --win",
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": ["obs", "voice-control", "streaming"],
+  "author": "StreamVoice Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "obs-websocket-js": "^5.0.5",
+    "electron-updater": "^6.1.7"
+  },
+  "build": {
+    "appId": "com.streamvoice.app",
+    "productName": "StreamVoice",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StreamVoice"
+    }
+  }
+}

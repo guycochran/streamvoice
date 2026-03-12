@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVoice</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Custom Title Bar -->
+    <div class="titlebar">
+        <div class="titlebar-drag-region">
+            <img src="../assets/icon-small.png" class="titlebar-icon">
+            <span class="titlebar-title">StreamVoice</span>
+        </div>
+        <div class="titlebar-controls">
+            <button class="titlebar-btn" id="minimize-btn">
+                <svg width="10" height="1">
+                    <path d="M 0 0 L 10 0" stroke="white" stroke-width="1"/>
+                </svg>
+            </button>
+            <button class="titlebar-btn" id="maximize-btn">
+                <svg width="10" height="10">
+                    <path d="M 0 0 L 10 0 L 10 10 L 0 10 Z" stroke="white" fill="transparent" stroke-width="1"/>
+                </svg>
+            </button>
+            <button class="titlebar-btn close" id="close-btn">
+                <svg width="10" height="10">
+                    <path d="M 0 0 L 10 10 M 10 0 L 0 10" stroke="white" stroke-width="1"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-dot" id="obs-status"></span>
+                <span>OBS: <span id="obs-status-text">Checking...</span></span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot active"></span>
+                <span>Voice: Ready</span>
+            </div>
+            <div class="version">v1.0.0</div>
+        </div>
+
+        <!-- Main Control -->
+        <div class="main-control">
+            <div class="voice-control-section">
+                <h1>🎤 Voice Control</h1>
+                <p class="subtitle">Hold the button and speak your command</p>
+
+                <button class="voice-button" id="voice-btn">
+                    <div class="mic-icon">🎤</div>
+                    <div class="voice-status">Press & Hold to Talk</div>
+                </button>
+
+                <div class="command-feedback" id="command-feedback"></div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="action-grid">
+                    <button class="action-btn" data-command="start recording">
+                        <span class="action-icon">⏺️</span>
+                        <span>Start Recording</span>
+                    </button>
+                    <button class="action-btn" data-command="start streaming">
+                        <span class="action-icon">📡</span>
+                        <span>Start Streaming</span>
+                    </button>
+                    <button class="action-btn" data-command="mute mic">
+                        <span class="action-icon">🔇</span>
+                        <span>Mute Mic</span>
+                    </button>
+                    <button class="action-btn" data-command="take screenshot">
+                        <span class="action-icon">📸</span>
+                        <span>Screenshot</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel">
+            <h3>Settings</h3>
+            <label class="checkbox-label">
+                <input type="checkbox" id="start-with-windows">
+                <span>Start with Windows</span>
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="minimize-to-tray" checked>
+                <span>Minimize to system tray</span>
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="auto-connect" checked>
+                <span>Auto-connect to OBS</span>
+            </label>
+
+            <div class="settings-actions">
+                <button class="settings-btn" id="view-commands">View All Commands</button>
+                <button class="settings-btn" id="check-updates">Check for Updates</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden iframe for web UI -->
+    <iframe id="web-ui" src="http://localhost:3030/index-enhanced.html" style="display: none;"></iframe>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
