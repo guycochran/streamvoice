@@ -1,6 +1,6 @@
 # StreamVoice Development Session Status
 **Date**: March 12, 2026
-**Last Update**: 4:30 PM UTC
+**Last Update**: 7:30 PM UTC
 
 ## Current Status
 
@@ -22,7 +22,13 @@
    - Added CORS configuration
    - Server now serves static files
    - Added automatic firewall rules
-   - Currently building: https://github.com/guycochran/streamvoice/releases/tag/v1.0.7
+   - Issue: GitHub Actions build failed
+
+4. **Working on v1.0.8/v1.0.9** - Fixing GitHub Actions build
+   - Tried separate electron-builder.json (v1.0.8) - still failed
+   - Simplified build config in package.json (v1.0.9)
+   - Explicit file patterns to handle subdirectory structure
+   - Currently building: https://github.com/guycochran/streamvoice/releases/tag/v1.0.9
 
 ### 🔧 Technical Architecture
 
@@ -40,8 +46,9 @@ The issue was the iframe couldn't reach localhost:3030 due to Electron security.
 |---------|-------|-----|---------|
 | v1.0.5 | Server didn't start in .exe | - | Fixed in v1.0.6 |
 | v1.0.6 | Frontend couldn't reach backend | Added dependencies, error handling | Fixed in v1.0.7 |
-| v1.0.7 | GitHub Actions build failed | CORS, serve static files, firewall rules | Fixed in v1.0.8 |
-| v1.0.8 | - | Moved electron-builder config to separate file | Building now |
+| v1.0.7 | GitHub Actions build failed | CORS, serve static files, firewall rules | Working |
+| v1.0.8 | Build still failed | Moved electron-builder config to separate file | Failed |
+| v1.0.9 | - | Simplified build config with explicit file patterns | Building now |
 
 ### 🚀 Next Priority Tasks (from NEXT_STEPS_AFTER_V1.0.5.md)
 
@@ -92,11 +99,15 @@ The issue was the iframe couldn't reach localhost:3030 due to Electron security.
 
 3. **Start next feature** (recommend SV-004: Startup Health Checks)
 
-### 🛠️ GitHub Actions Build Fix (v1.0.8)
+### 🛠️ GitHub Actions Build Issues (v1.0.8/v1.0.9)
 
-**Problem**: electron-builder was failing due to complex directory structure
-**Solution**: Created separate `electron-builder.json` with explicit file patterns
-**Result**: Build should now succeed and produce installers automatically
+**Problem**: electron-builder was failing in GitHub Actions (works locally)
+**Attempted Solutions**:
+1. v1.0.8: Created separate `electron-builder.json` with explicit file patterns - Failed
+2. v1.0.9: Simplified build config in package.json with minimal file patterns - In progress
+
+**Root Cause**: Likely the subdirectory structure (server/, web/, renderer/) confusing electron-builder
+**Next Steps**: May need to restructure app to flatten directory hierarchy
 
 ### 💡 Architecture Insights
 
