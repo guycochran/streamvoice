@@ -31,21 +31,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 - Enhanced .gitignore for cleaner repo
 - Moved old files to archive folder
 - Fixed nested directory issue in electron-app
-- Debugged GitHub Actions (simplified workflows)
-- Added package-lock.json to fix npm ci
+- Extensive GitHub Actions debugging (40+ test workflows created)
+- Discovered the issue: electron-app structure conflicts with electron-builder
+- Success: Test Electron Builder workflow works with minimal app
+- Archived all test workflows to clean up repository
+
+### 📋 GitHub Actions Investigation Results
+**Key Findings:**
+- ✅ Test Electron Builder succeeded (minimal app from scratch)
+- ❌ All attempts to build actual electron-app failed
+- ✅ npm/node/electron installation works fine
+- ❌ electron-builder fails with our specific project structure
+
+**Root Cause:** The electron-app directory contains subdirectories (server, web, renderer, scripts) that confuse electron-builder. The tool expects a simpler structure with just the main process files.
 
 ### 📋 Tomorrow's Priority Tasks
-1. **Fix GitHub Actions** - Builds still failing, need to investigate further
-2. **Create Screenshots** - Professional app screenshots for README
-3. **Test Windows Installer** - Verify .exe works on clean Windows machine
-4. **Create Demo Video** - Quick 60-second demo for landing page
-5. **Release v1.0.0** - Create official GitHub release with installer
+1. **Restructure electron-app** - Move server/web folders out, keep only Electron files
+2. **Fix GitHub Actions** - Should work after restructuring
+3. **Create Screenshots** - Professional app screenshots for README
+4. **Test Windows Installer** - Verify .exe works on clean Windows machine
+5. **Create Demo Video** - Quick 60-second demo for landing page
+6. **Release v1.0.0** - Create official GitHub release with installer
 
-### 🔧 Technical Issues to Resolve
-- GitHub Actions failing quickly (5-6 seconds)
-- May need to check workflow permissions or secrets
-- Consider using npm install instead of npm ci
-- Verify electron-builder configuration
+### 🔧 Technical Solution
+To fix the build:
+1. Move `electron-app/server` to root `streamvoice-server`
+2. Move `electron-app/web` to root `streamvoice-web`
+3. Keep only Electron-specific files in `electron-app`
+4. Update paths in main.js to reference the new locations
+5. Use `npm install` instead of `npm ci` in workflows
 
 ## Directory Structure
 
