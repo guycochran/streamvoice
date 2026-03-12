@@ -9,7 +9,11 @@ let serverProcess;
 
 // Enable live reload for Electron
 if (process.env.NODE_ENV === 'development') {
-  require('electron-reload')(__dirname);
+  try {
+    require('electron-reload')(__dirname);
+  } catch (e) {
+    // electron-reload not available in production
+  }
 }
 
 // Prevent multiple instances
