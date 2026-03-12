@@ -1,0 +1,63 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install Python dependencies
+      run: pip install Pillow
+
+    - name: Cache node modules
+      uses: actions/cache@v3
+      with:
+        path: electron-app/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('electron-app/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install dependencies
+      working-directory: electron-app
+      run: npm install
+
+    - name: Generate icons
+      working-directory: electron-app
+      run: python scripts/generate-icons.py
+
+    - name: Build Windows installer
+      working-directory: electron-app
+      run: npm run build-win
+
+    - name: Upload installer
+      uses: actions/upload-artifact@v3
+      with:
+        name: StreamVoice-Setup
+        path: electron-app/dist/StreamVoice-Setup-*.exe
+
+    - name: Create Release (if tagged)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: electron-app/dist/StreamVoice-Setup-*.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

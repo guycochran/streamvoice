@@ -1,0 +1,97 @@
+name: Build Electron App
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: electron-app/package-lock.json
+
+    - name: Install dependencies
+      working-directory: electron-app
+      run: npm ci
+
+    - name: Generate icons
+      working-directory: electron-app
+      run: |
+        pip install Pillow
+        python scripts/generate-icons.py
+
+    - name: Build Electron app
+      working-directory: electron-app
+      run: npm run build-win
+      if: matrix.os == 'windows-latest'
+
+    - name: Build Electron app (Mac)
+      working-directory: electron-app
+      run: npm run dist -- --mac
+      if: matrix.os == 'macos-latest'
+
+    - name: Build Electron app (Linux)
+      working-directory: electron-app
+      run: npm run dist -- --linux
+      if: matrix.os == 'ubuntu-latest'
+
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v3
+      if: matrix.os == 'windows-latest'
+      with:
+        name: StreamVoice-Windows
+        path: electron-app/dist/*.exe
+
+    - name: Upload Mac artifacts
+      uses: actions/upload-artifact@v3
+      if: matrix.os == 'macos-latest'
+      with:
+        name: StreamVoice-Mac
+        path: electron-app/dist/*.dmg
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v3
+      if: matrix.os == 'ubuntu-latest'
+      with:
+        name: StreamVoice-Linux
+        path: electron-app/dist/*.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          StreamVoice-Windows/*.exe
+          StreamVoice-Mac/*.dmg
+          StreamVoice-Linux/*.AppImage
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
