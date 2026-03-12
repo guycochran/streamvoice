@@ -582,6 +582,22 @@
             };
 
             try {
+                if (window.electronAPI?.desktopSaveObsSettings) {
+                    const result = await window.electronAPI.desktopSaveObsSettings(settings);
+                    if (!result.success) {
+                        throw new Error(result.error || 'Failed to save settings');
+                    }
+                    const statusDiv = document.getElementById('settings-status');
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = '#2ecc71';
+                    statusDiv.style.color = '#fff';
+                    statusDiv.textContent = '✅ Settings saved successfully! Reconnecting to OBS...';
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 3000);
+                    return;
+                }
+
                 const response = await fetch(`${getApiBaseUrl()}/api/settings/obs`, {
                     method: 'POST',
                     headers: {
@@ -623,6 +639,17 @@
             statusDiv.textContent = '🔄 Testing OBS connection...';
 
             try {
+                if (window.electronAPI?.desktopTestObsConnection) {
+                    const result = await window.electronAPI.desktopTestObsConnection();
+                    if (result.success) {
+                        statusDiv.style.background = '#2ecc71';
+                        statusDiv.textContent = `✅ Connected to OBS! Version: ${result.obsVersion || 'Unknown'}`;
+                    } else {
+                        throw new Error(result.error || 'Connection test failed');
+                    }
+                    return;
+                }
+
                 const response = await fetch(`${getApiBaseUrl()}/api/obs/test-connection`, {
                     method: 'POST'
                 });
@@ -644,6 +671,14 @@
         // Load settings on page load
         async function loadObsSettings() {
             try {
+                if (window.electronAPI?.desktopGetObsSettings) {
+                    const settings = await window.electronAPI.desktopGetObsSettings();
+                    document.getElementById('obs-host').value = settings.host || '127.0.0.1';
+                    document.getElementById('obs-port').value = settings.port || 4455;
+                    document.getElementById('obs-password').value = settings.password || '';
+                    return;
+                }
+
                 const response = await fetch(`${getApiBaseUrl()}/api/settings/obs`);
                 if (response.ok) {
                     const settings = await response.json();

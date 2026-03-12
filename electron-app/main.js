@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, dialog } = require('electron');
 const http = require('http');
 const fs = require('fs');
+const OBSWebSocket = require('obs-websocket-js').default;
 const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
@@ -10,6 +11,7 @@ let tray;
 let serverProcess;
 let obsSettingsFilePath;
 let backendLogFilePath;
+let desktopObsReconnectTimer = null;
 const LOCAL_API_PORT = '3030';
 const LOCAL_WS_PORT = '8090';
 const SERVER_BASE_URL_CANDIDATES = [
@@ -18,6 +20,20 @@ const SERVER_BASE_URL_CANDIDATES = [
   `http://[::1]:${LOCAL_API_PORT}`
 ];
 let resolvedServerBaseUrl = null;
+const desktopObs = new OBSWebSocket();
+let desktopObsState = {
+  connected: false,
+  status: 'disconnected',
+  url: 'ws://127.0.0.1:4455',
+  reconnectAttempts: 0,
+  lastSuccessfulConnection: null,
+  lastError: null,
+  settings: {
+    host: '127.0.0.1',
+    port: 4455,
+    password: ''
+  }
+};
 
 // Enable live reload for Electron
 if (process.env.NODE_ENV === 'development') {
@@ -47,9 +63,11 @@ function createWindow() {
     height: 800,
     icon: path.join(__dirname, 'assets/icon.png'),
     webPreferences: {
+      allowRunningInsecureContent: true,
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false
     },
     frame: true,
     backgroundColor: '#0a0a0a',
@@ -210,7 +228,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.19',
+          message: 'StreamVoice v1.1.0-alpha.1',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -307,6 +325,141 @@ function appendBackendLog(message) {
   const line = `[${new Date().toISOString()}] ${message.endsWith('\n') ? message : `${message}\n`}`;
   fs.appendFile(backendLogFilePath, line, () => {});
 }
+
+function loadDesktopObsSettings() {
+  try {
+    if (!obsSettingsFilePath || !fs.existsSync(obsSettingsFilePath)) {
+      return;
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(obsSettingsFilePath, 'utf8'));
+    if (!parsed || !parsed.host || !parsed.port) {
+      return;
+    }
+
+    desktopObsState.settings = {
+      host: parsed.host,
+      port: Number(parsed.port),
+      password: parsed.password || ''
+    };
+  } catch (error) {
+    desktopObsState.lastError = `Failed to load OBS settings: ${error.message}`;
+  }
+}
+
+function persistDesktopObsSettings() {
+  if (!obsSettingsFilePath) {
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(obsSettingsFilePath), { recursive: true });
+  fs.writeFileSync(obsSettingsFilePath, JSON.stringify(desktopObsState.settings, null, 2));
+}
+
+function buildDesktopObsUrl() {
+  return `ws://${desktopObsState.settings.host}:${desktopObsState.settings.port}`;
+}
+
+function getDesktopObsStatus() {
+  return {
+    connected: desktopObsState.connected,
+    status: desktopObsState.status,
+    url: desktopObsState.url,
+    reconnectAttempts: desktopObsState.reconnectAttempts,
+    lastSuccessfulConnection: desktopObsState.lastSuccessfulConnection,
+    lastError: desktopObsState.lastError
+  };
+}
+
+function getDesktopHealthStatus() {
+  const startTime = app.getAppMetrics?.()[0]?.creationTime || Date.now();
+
+  return {
+    status: desktopObsState.connected ? 'healthy' : 'degraded',
+    uptime: 0,
+    subsystems: {
+      app: {
+        status: 'healthy',
+        version: app.getVersion(),
+        pid: process.pid,
+        lastError: null,
+        startTime
+      },
+      backend: {
+        status: 'unknown',
+        httpApi: {
+          status: 'unknown',
+          port: LOCAL_API_PORT,
+          lastError: null
+        },
+        webSocket: {
+          status: 'unknown',
+          port: LOCAL_WS_PORT,
+          clients: 0,
+          lastError: null
+        }
+      },
+      obs: {
+        status: desktopObsState.status,
+        url: desktopObsState.url,
+        connected: desktopObsState.connected,
+        reconnectAttempts: desktopObsState.reconnectAttempts,
+        lastSuccessfulConnection: desktopObsState.lastSuccessfulConnection,
+        lastError: desktopObsState.lastError
+      },
+      speech: {
+        status: 'unknown',
+        engine: 'WebSpeechAPI',
+        supported: null
+      },
+      microphone: {
+        status: 'unknown',
+        lastError: null
+      }
+    }
+  };
+}
+
+function broadcastDesktopStatus() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('desktop-status-updated', getDesktopObsStatus());
+  }
+}
+
+async function connectDesktopObs() {
+  clearTimeout(desktopObsReconnectTimer);
+  desktopObsState.status = 'connecting';
+  desktopObsState.url = buildDesktopObsUrl();
+  desktopObsState.reconnectAttempts += 1;
+  broadcastDesktopStatus();
+
+  try {
+    await desktopObs.connect(desktopObsState.url, desktopObsState.settings.password);
+    desktopObsState.connected = true;
+    desktopObsState.status = 'connected';
+    desktopObsState.lastError = null;
+    desktopObsState.lastSuccessfulConnection = new Date().toISOString();
+  } catch (error) {
+    desktopObsState.connected = false;
+    desktopObsState.status = 'error';
+    desktopObsState.lastError = error.message;
+    desktopObsReconnectTimer = setTimeout(() => {
+      connectDesktopObs();
+    }, 5000);
+  }
+
+  broadcastDesktopStatus();
+}
+
+desktopObs.on('ConnectionClosed', () => {
+  desktopObsState.connected = false;
+  desktopObsState.status = 'disconnected';
+  broadcastDesktopStatus();
+  clearTimeout(desktopObsReconnectTimer);
+  desktopObsReconnectTimer = setTimeout(() => {
+    connectDesktopObs();
+  }, 5000);
+});
 
 async function resolveServerBaseUrl(forceRefresh = false) {
   if (resolvedServerBaseUrl && !forceRefresh) {
@@ -444,9 +597,11 @@ app.whenReady().then(() => {
   obsSettingsFilePath = path.join(app.getPath('userData'), 'obs-settings.json');
   backendLogFilePath = path.join(app.getPath('userData'), 'backend.log');
   fs.writeFileSync(backendLogFilePath, '', { flag: 'a' });
+  loadDesktopObsSettings();
   createWindow();
   createTray();
   startBackendServer();
+  connectDesktopObs();
 });
 
 app.on('window-all-closed', () => {
@@ -460,6 +615,8 @@ app.on('before-quit', () => {
   if (serverProcess) {
     serverProcess.kill();
   }
+  clearTimeout(desktopObsReconnectTimer);
+  desktopObs.disconnect().catch(() => {});
 });
 
 app.on('activate', () => {
@@ -482,6 +639,57 @@ ipcMain.handle('get-version', () => {
 
 ipcMain.handle('get-settings', () => {
   return appSettings;
+});
+
+ipcMain.handle('desktop-get-status', () => {
+  return getDesktopObsStatus();
+});
+
+ipcMain.handle('desktop-get-health', () => {
+  return getDesktopHealthStatus();
+});
+
+ipcMain.handle('desktop-get-obs-settings', () => {
+  return { ...desktopObsState.settings };
+});
+
+ipcMain.handle('desktop-save-obs-settings', async (event, settings) => {
+  desktopObsState.settings = {
+    host: settings.host || '127.0.0.1',
+    port: Number(settings.port) || 4455,
+    password: settings.password || ''
+  };
+  persistDesktopObsSettings();
+
+  try {
+    await desktopObs.disconnect();
+  } catch (error) {
+    // Ignore disconnect errors during reconnect.
+  }
+
+  await connectDesktopObs();
+  return { success: true };
+});
+
+ipcMain.handle('desktop-test-obs-connection', async () => {
+  const testObs = new OBSWebSocket();
+  const url = buildDesktopObsUrl();
+
+  try {
+    await testObs.connect(url, desktopObsState.settings.password);
+    const version = await testObs.call('GetVersion');
+    await testObs.disconnect();
+    return {
+      success: true,
+      obsVersion: version.obsVersion,
+      obsWebSocketVersion: version.obsWebSocketVersion
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 });
 
 ipcMain.handle('get-server-base-url', async () => {

@@ -13,8 +13,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // OBS connection
     checkOBSConnection: () => ipcRenderer.invoke('check-obs-connection'),
+    desktopGetHealth: () => ipcRenderer.invoke('desktop-get-health'),
+    desktopGetObsSettings: () => ipcRenderer.invoke('desktop-get-obs-settings'),
+    desktopGetStatus: () => ipcRenderer.invoke('desktop-get-status'),
+    desktopSaveObsSettings: (settings) => ipcRenderer.invoke('desktop-save-obs-settings', settings),
+    desktopTestObsConnection: () => ipcRenderer.invoke('desktop-test-obs-connection'),
     getServerBaseUrl: () => ipcRenderer.invoke('get-server-base-url'),
     getBackendLogTail: () => ipcRenderer.invoke('get-backend-log-tail'),
+    onDesktopStatusUpdated: (callback) => ipcRenderer.on('desktop-status-updated', (_event, status) => callback(status)),
 
     // Settings
     getSettings: () => ipcRenderer.invoke('get-settings'),

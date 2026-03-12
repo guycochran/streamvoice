@@ -8,6 +8,7 @@ class StreamVoiceEnhanced {
         this.currentScene = '';
         this.commandCategories = {};
         this.apiBaseUrl = this.detectApiBaseUrl();
+        this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -95,6 +96,12 @@ class StreamVoiceEnhanced {
     }
 
     async refreshHealthStatus() {
+        if (this.hasDesktopBridge) {
+            this.healthStatus = await window.electronAPI.desktopGetHealth();
+            this.renderHealthStatus();
+            return;
+        }
+
         try {
             const response = await fetch(`${this.apiBaseUrl}/api/health`);
             if (!response.ok) {
@@ -109,6 +116,25 @@ class StreamVoiceEnhanced {
     }
 
     async refreshStatusFromApi() {
+        if (this.hasDesktopBridge) {
+            const status = await window.electronAPI.desktopGetStatus();
+            this.serverReachable = true;
+            this.lastApiError = status.lastError || null;
+            this.debugStatus = {
+                connected: status.connected,
+                obsWebSocketUrl: status.url,
+                lastObsError: status.lastError,
+                uptimeSeconds: null,
+                pid: null,
+                websocketClients: 0
+            };
+            this.obsConnected = Boolean(status.connected);
+            this.updateConnectionStatus();
+            this.updateOBSStatus();
+            this.renderDiagnostics();
+            return;
+        }
+
         try {
             const response = await fetch(`${this.apiBaseUrl}/api/debug/status`);
             if (!response.ok) {
@@ -816,23 +842,29 @@ class StreamVoiceEnhanced {
 
     generateDiagnosticReport() {
         const now = new Date().toISOString();
-        const uptime = this.healthStatus?.app?.startTime
-            ? Math.floor((Date.now() - this.healthStatus.app.startTime) / 1000)
+        const subsystems = this.healthStatus?.subsystems || {};
+        const appHealth = this.healthStatus?.app || subsystems.app || {};
+        const backendHealth = this.healthStatus?.backend || subsystems.backend || {};
+        const obsHealth = this.healthStatus?.obs || subsystems.obs || {};
+        const speechHealth = this.healthStatus?.speech || subsystems.speech || {};
+        const micHealth = this.healthStatus?.microphone || subsystems.microphone || {};
+        const uptime = appHealth.startTime
+            ? Math.floor((Date.now() - appHealth.startTime) / 1000)
             : 'unknown';
 
         let report = `StreamVoice Diagnostic Report
 Generated: ${now}
-Version: ${this.healthStatus?.app?.version || 'unknown'}
+Version: ${appHealth.version || 'unknown'}
 Uptime: ${uptime} seconds
 
 === SYSTEM HEALTH ===
-Overall Status: ${this.healthStatus?.overall || 'unknown'}
+Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'unknown'}
 
 === SUBSYSTEMS ===
 `;
 
         // App status
-        const app = this.healthStatus?.app || {};
+        const app = appHealth;
         report += `\nApp Runtime:
   Status: ${app.status || 'unknown'}
   PID: ${app.pid || 'unknown'}
@@ -840,7 +872,7 @@ Overall Status: ${this.healthStatus?.overall || 'unknown'}
 `;
 
         // Backend status
-        const backend = this.healthStatus?.backend || {};
+        const backend = backendHealth;
         report += `\nBackend Service:
   Status: ${backend.status || 'unknown'}
 `;
@@ -863,7 +895,7 @@ Overall Status: ${this.healthStatus?.overall || 'unknown'}
 `;
 
         // OBS
-        const obs = this.healthStatus?.obs || {};
+        const obs = obsHealth;
         report += `\nOBS Connection:
   Status: ${obs.status || 'unknown'}
   URL: ${obs.url || 'unknown'}
@@ -874,7 +906,7 @@ Overall Status: ${this.healthStatus?.overall || 'unknown'}
 `;
 
         // Speech
-        const speech = this.healthStatus?.speech || {};
+        const speech = speechHealth;
         report += `\nSpeech Recognition:
   Status: ${speech.status || 'unknown'}
   Engine: ${speech.engine || 'unknown'}
@@ -882,7 +914,7 @@ Overall Status: ${this.healthStatus?.overall || 'unknown'}
 `;
 
         // Microphone
-        const mic = this.healthStatus?.microphone || {};
+        const mic = micHealth;
         report += `\nMicrophone:
   Status: ${mic.status || 'unknown'}
   Last Error: ${mic.lastError || 'none'}
