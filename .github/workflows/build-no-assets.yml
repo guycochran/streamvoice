@@ -1,0 +1,44 @@
+name: Build No Assets
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Remove icon requirement from package.json
+      working-directory: electron-app
+      run: |
+        $package = Get-Content package.json | ConvertFrom-Json
+        if ($package.build.win.PSObject.Properties['icon']) {
+          $package.build.win.PSObject.Properties.Remove('icon')
+        }
+        $package | ConvertTo-Json -Depth 10 | Out-File -Encoding UTF8 package.json
+
+    - name: Install
+      working-directory: electron-app
+      run: npm install
+
+    - name: Build without icon
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: |
+        npx electron-builder --win --publish never
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: no-assets-build
+        path: electron-app/dist/*.exe
+        if-no-files-found: warn

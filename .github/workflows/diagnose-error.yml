@@ -1,0 +1,64 @@
+name: Diagnose Error
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install and show versions
+      working-directory: electron-app
+      run: |
+        npm install
+        echo "=== Node version ==="
+        node --version
+        echo "=== NPM version ==="
+        npm --version
+        echo "=== Electron version ==="
+        npx electron --version
+        echo "=== Electron-builder version ==="
+        npx electron-builder --version
+
+    - name: Try different build commands
+      working-directory: electron-app
+      continue-on-error: true
+      run: |
+        echo "=== Try 1: npm run build-win ==="
+        npm run build-win 2>&1 | Tee-Object build1.log
+        echo "Exit code: $LASTEXITCODE"
+
+        echo "`n=== Try 2: npx electron-builder --win ==="
+        npx electron-builder --win 2>&1 | Tee-Object build2.log
+        echo "Exit code: $LASTEXITCODE"
+
+        echo "`n=== Try 3: With --no-publish ==="
+        npx electron-builder --win --publish never 2>&1 | Tee-Object build3.log
+        echo "Exit code: $LASTEXITCODE"
+
+    - name: Show error logs
+      working-directory: electron-app
+      if: always()
+      run: |
+        echo "=== Build 1 log ==="
+        if (Test-Path build1.log) { Get-Content build1.log }
+        echo "`n=== Build 2 log ==="
+        if (Test-Path build2.log) { Get-Content build2.log }
+        echo "`n=== Build 3 log ==="
+        if (Test-Path build3.log) { Get-Content build3.log }
+
+    - name: Upload all logs
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: diagnose-logs
+        path: electron-app/*.log
