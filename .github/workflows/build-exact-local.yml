@@ -1,0 +1,56 @@
+name: Build Exact Local
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '24.10.0'  # Same as local
+
+    - name: Diagnostic info
+      working-directory: electron-app
+      run: |
+        echo "=== System Info ==="
+        node -v
+        npm -v
+        echo "=== Directory ==="
+        pwd
+        dir
+        echo "=== Package.json ==="
+        type package.json
+
+    - name: Clean install
+      working-directory: electron-app
+      run: |
+        if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }
+        if (Test-Path package-lock.json) { Remove-Item -Force package-lock.json }
+        npm install --force
+
+    - name: Verify installation
+      working-directory: electron-app
+      run: |
+        npm list --depth=0
+        if (!(Test-Path node_modules/electron)) { echo "ERROR: Electron not installed!" }
+        if (!(Test-Path node_modules/electron-builder)) { echo "ERROR: Electron-builder not installed!" }
+
+    - name: Build
+      working-directory: electron-app
+      run: |
+        $env:DEBUG = "electron-builder"
+        npm run build-win 2>&1 | Tee-Object -FilePath build.log
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-logs
+        path: electron-app/build.log

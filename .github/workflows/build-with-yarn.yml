@@ -1,0 +1,36 @@
+name: Build with Yarn
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install Yarn
+      run: npm install -g yarn
+
+    - name: Install with Yarn
+      working-directory: electron-app
+      run: |
+        yarn install --network-timeout 100000
+        yarn list electron-builder
+
+    - name: Build with Yarn
+      working-directory: electron-app
+      run: yarn run build-win
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: StreamVoice-Yarn
+        path: electron-app/dist/*.exe
