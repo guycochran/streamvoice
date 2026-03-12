@@ -40,7 +40,8 @@ The issue was the iframe couldn't reach localhost:3030 due to Electron security.
 |---------|-------|-----|---------|
 | v1.0.5 | Server didn't start in .exe | - | Fixed in v1.0.6 |
 | v1.0.6 | Frontend couldn't reach backend | Added dependencies, error handling | Fixed in v1.0.7 |
-| v1.0.7 | - | CORS, serve static files, firewall rules | Building now |
+| v1.0.7 | GitHub Actions build failed | CORS, serve static files, firewall rules | Fixed in v1.0.8 |
+| v1.0.8 | - | Moved electron-builder config to separate file | Building now |
 
 ### 🚀 Next Priority Tasks (from NEXT_STEPS_AFTER_V1.0.5.md)
 
@@ -82,14 +83,20 @@ The issue was the iframe couldn't reach localhost:3030 due to Electron security.
 
 ### 🔄 To Resume Development
 
-1. **Check v1.0.7 build status**:
+1. **Check v1.0.8 build status**:
    ```bash
-   curl -s https://api.github.com/repos/guycochran/streamvoice/releases/tags/v1.0.7 | jq '.assets'
+   curl -s https://api.github.com/repos/guycochran/streamvoice/releases/tags/v1.0.8 | jq '.assets'
    ```
 
-2. **Test the v1.0.7 installer** when ready
+2. **Test the v1.0.8 installer** when ready
 
 3. **Start next feature** (recommend SV-004: Startup Health Checks)
+
+### 🛠️ GitHub Actions Build Fix (v1.0.8)
+
+**Problem**: electron-builder was failing due to complex directory structure
+**Solution**: Created separate `electron-builder.json` with explicit file patterns
+**Result**: Build should now succeed and produce installers automatically
 
 ### 💡 Architecture Insights
 
