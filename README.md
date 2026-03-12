@@ -1,202 +1,122 @@
-# 🎙️ StreamVoice - Voice Control for OBS
+# StreamVoice
 
-Never alt-tab out of your game again! Control OBS Studio with simple voice commands.
+Professional voice control for OBS Studio. Control your streams hands-free with natural voice commands.
 
-![StreamVoice Demo](https://img.shields.io/badge/version-v0.2.0-brightgreen) ![Status](https://img.shields.io/badge/status-working!-success) ![Platform](https://img.shields.io/badge/platform-windows-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-v1.0.0-brightgreen) ![Platform](https://img.shields.io/badge/platform-windows-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Status](https://img.shields.io/badge/status-stable-success)
 
-## 🎉 v0.2.0 UPDATE: IT ACTUALLY CONTROLS OBS NOW!
+## 🎤 What is StreamVoice?
 
-**StreamVoice now uses OBS WebSocket for REAL control!** Scene switching, recording, streaming - it all works!
+StreamVoice gives you hands-free control of OBS Studio through natural voice commands. Built as a desktop application, it runs quietly in your system tray and responds instantly when you need it. No more interrupting gameplay to switch scenes or manage your stream.
 
-## 🎮 Why StreamVoice?
+### ✨ Key Features
 
-Every streamer knows the pain:
-- 🎯 You're in an intense fight
-- 📹 Need to switch scenes
-- 💀 Alt-tab = Death
-- 😤 Viewers see you die while fumbling with OBS
+- **70+ Voice Commands** - Control scenes, sources, recording, streaming, audio, and more
+- **Natural Language** - Say "switch to my game" instead of memorizing exact commands
+- **Desktop Application** - Professional Windows app with auto-updates
+- **System Tray** - Runs quietly in the background
+- **Hold-to-Talk** - Crystal clear voice recognition
+- **Zero Configuration** - Works with OBS defaults
 
-**StreamVoice solves this with simple voice commands!**
+## 📥 Download
 
-## 🚀 Quick Start (2 minutes)
+### Windows Installer
+**[Download StreamVoice Setup (Windows)](https://github.com/guycochran/streamvoice/releases/latest/download/StreamVoice-Setup.exe)**
 
-### Prerequisites
-- Windows 10 or later
-- [Node.js](https://nodejs.org/) (LTS version)
-- Chrome browser (for voice recognition)
-- OBS Studio v28+ (WebSocket built-in!) - See [Setup Guide](OBS_WEBSOCKET_SETUP.md)
+*Requires Windows 10 or later*
 
-### Installation
+### Other Platforms
+macOS and Linux support coming soon!
 
-1. **Download the installer**
-   - [📥 Download StreamVoice-Installer.bat](https://github.com/guycochran/streamvoice/releases/latest/download/install-windows.bat)
+## 🚀 Getting Started
 
-2. **Run the installer**
-   - Double-click `install-windows.bat`
-   - It will install StreamVoice to `%USERPROFILE%\StreamVoice`
-   - Creates a desktop shortcut
+### 1. Setup OBS Studio
 
-3. **Start StreamVoice**
-   - Click the StreamVoice desktop shortcut
-   - Chrome will open with the StreamVoice interface
-   - You should see "Connected" status
+StreamVoice requires OBS Studio with WebSocket enabled:
+
+1. Open OBS Studio (v28 or later)
+2. Go to Tools → WebSocket Server Settings
+3. Enable WebSocket server
+4. Set a password (remember it!)
+5. Click OK
+
+### 2. Install StreamVoice
+
+1. Download the installer above
+2. Run `StreamVoice-Setup.exe`
+3. Follow the installation wizard
+4. StreamVoice will launch automatically
+
+### 3. Connect to OBS
+
+1. Enter your OBS WebSocket password
+2. Click Connect
+3. Green status = Ready to use!
 
 ## 🎤 Voice Commands
 
-Hold the microphone button and say:
+Hold the microphone button and speak naturally:
 
 ### Scene Control
-- **"Switch to gameplay"** - Switch to your gameplay scene
-- **"Switch to just chatting"** - Switch to just chatting scene
-- **"Switch to starting"** - Switch to starting soon scene
-- **"Switch to break"** - Switch to BRB scene
-- **"Switch to ending"** - Switch to ending scene
+- "Switch to gameplay"
+- "Go to starting soon"
+- "Show my webcam scene"
+- "Back to desktop"
 
-### Recording/Streaming
-- **"Start recording"** - Start recording
-- **"Stop recording"** - Stop recording
-- **"Start streaming"** - Go live
-- **"Stop streaming"** - End stream
+### Recording & Streaming
+- "Start recording"
+- "Stop streaming"
+- "Pause the recording"
 
 ### Audio Control
-- **"Mute my mic"** - Mute microphone
-- **"Unmute my mic"** - Unmute microphone
-- **"Mute desktop"** - Mute desktop audio
-- **"Unmute desktop"** - Unmute desktop audio
+- "Mute my mic"
+- "Increase game audio"
+- "Lower desktop sound"
 
 ### Quick Actions
-- **"Emergency privacy"** - Instant privacy screen
-- **"Show my screen"** - Show display capture
-- **"Hide my screen"** - Hide display capture
-- **"Show webcam"** - Show webcam
-- **"Hide webcam"** - Hide webcam
-- **"Activate sponsor mode"** - Show sponsor overlay
+- "Take a screenshot"
+- "Enable green screen"
+- "Hide my webcam"
 
-## 🛠️ Manual Installation
+[View all 70+ commands →](https://github.com/guycochran/streamvoice/wiki/Commands)
 
-If the installer doesn't work:
+## 🛠️ Troubleshooting
 
-```bash
-# Clone the repository
-git clone https://github.com/guycochran/streamvoice.git
-cd streamvoice
+### Can't Connect to OBS?
+1. Make sure OBS is running
+2. Check WebSocket is enabled in OBS settings
+3. Verify the password is correct
+4. Try restarting both applications
 
-# Install server dependencies
-cd server
-npm install
+### Voice Commands Not Working?
+1. Click "Allow" when Chrome asks for microphone permission
+2. Hold the button while speaking
+3. Speak clearly and naturally
+4. Make sure your mic is working in Windows
 
-# Start the server
-npm start
+### Need Help?
+- [Documentation](https://github.com/guycochran/streamvoice/wiki)
+- [Report an Issue](https://github.com/guycochran/streamvoice/issues)
+- [Discussions](https://github.com/guycochran/streamvoice/discussions)
 
-# In a new terminal, serve the web interface
-cd ../web
-python -m http.server 8888
+## 🤝 Contributing
 
-# Open Chrome and go to http://localhost:8888
-```
+StreamVoice is open source and welcomes contributions!
 
-## 📹 How It Works
+- Report bugs or request features in [Issues](https://github.com/guycochran/streamvoice/issues)
+- Submit improvements via [Pull Requests](https://github.com/guycochran/streamvoice/pulls)
+- Share your experience in [Discussions](https://github.com/guycochran/streamvoice/discussions)
 
-1. **Press & Hold** the microphone button
-2. **Say a command** like "Switch to gameplay"
-3. **Release** the button
-4. StreamVoice sends the command to OBS
-5. Your stream updates instantly!
+## 📄 License
 
-## 🔧 Troubleshooting
+StreamVoice is MIT licensed. See [LICENSE](LICENSE) for details.
 
-**"Disconnected" Status**
-- Make sure the server is running (check StreamVoice console window)
-- Try refreshing the browser (Ctrl+Shift+R)
-- Check Windows Firewall isn't blocking Node.js
+## 🙏 Acknowledgments
 
-**Voice Not Working**
-- Must use Chrome browser
-- Allow microphone permissions when prompted
-- Speak clearly after the beep sound
-
-**Commands Not Working**
-- Ensure OBS Studio is running
-- Install CLI-Anything for OBS
-- Check the StreamVoice console for errors
-
-## 🤝 Beta Testing
-
-We're looking for 10 streamers to test StreamVoice!
-
-**v0.2.0 Status:** FULLY WORKING with OBS WebSocket!
-- ✅ Scene switching works instantly
-- ✅ Recording start/stop works
-- ✅ Streaming control works
-- ✅ Audio mute/unmute works
-- ✅ Real-time OBS feedback
-
-**What you get:**
-- ✅ Free access to all features
-- ✅ Direct support from the developer
-- ✅ Your feature requests prioritized
-- ✅ Credit as a founding user
-
-**What we need:**
-- 📊 Feedback on the voice control experience
-- 💡 Ideas for new commands
-- 🐛 Bug reports
-- 📹 A clip of you using it on stream (optional)
-
-Join our Discord: [discord.gg/streamvoice](#) (coming soon)
-
-## 🚦 Roadmap
-
-- [x] Basic voice commands
-- [x] Web interface
-- [ ] OBS WebSocket integration (better than CLI)
-- [ ] Custom command creation
-- [ ] Twitch chat integration
-- [ ] Stream Deck alternative mode
-- [ ] Multi-language support
-- [ ] Electron app
-- [ ] Steam release
-
-## 👨‍💻 Development
-
-Want to contribute or customize?
-
-```bash
-# Install dependencies
-cd server && npm install
-
-# Run in development mode
-npm run dev
-
-# Run tests
-npm test
-```
-
-### Adding Custom Commands
-
-Edit `server/index.js` and add to the `COMMAND_MAP`:
-
-```javascript
-const COMMAND_MAP = {
-  'your phrase': 'obs-cli-command',
-  // Add your custom commands here
-};
-```
-
-## 📝 License
-
-MIT License - Use it however you want!
-
-## 💖 Support
-
-If StreamVoice saves you from dying in-game:
-- ⭐ Star this repo
-- 🐦 Tweet about it
-- 💜 Follow on Twitch (coming soon)
-- ☕ [Buy me a coffee](https://buymeacoffee.com/streamvoice) (coming soon)
+Special thanks to:
+- The OBS Project for WebSocket support
+- Early beta testers who provided invaluable feedback
+- The streaming community for inspiration
 
 ---
 
-**Built with ❤️ for streamers by streamers**
-
-*Never alt-tab again!*
+**Built with ❤️ for streamers**
