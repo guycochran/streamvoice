@@ -1,0 +1,48 @@
+name: Build Final
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      working-directory: electron-app
+      run: |
+        npm install --force
+
+    - name: Build with electron-builder directly
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        npx electron-builder build --win --config.publish=null
+
+    - name: List output
+      working-directory: electron-app
+      if: always()
+      run: |
+        echo "=== Directory contents ==="
+        dir
+        if (Test-Path dist) {
+          echo "=== Dist contents ==="
+          dir dist
+        }
+
+    - name: Upload installer
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-installer-final
+        path: electron-app/dist/*.exe
+        if-no-files-found: warn
