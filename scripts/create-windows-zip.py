@@ -28,6 +28,7 @@ shutil.copytree("server", os.path.join(TEMP_DIR, "server"))
 shutil.copytree("web", os.path.join(TEMP_DIR, "web"))
 shutil.copy("EASY_TEST.bat", TEMP_DIR)
 shutil.copy("EASY_TEST_ENHANCED.bat", TEMP_DIR)
+shutil.copy("STREAMVOICE.bat", TEMP_DIR)
 
 # Create INSTALL.bat if it doesn't exist locally
 install_bat_content = """@echo off
@@ -74,10 +75,9 @@ with open(os.path.join(TEMP_DIR, "INSTALL.bat"), 'w') as f:
     f.write(install_bat_content)
 
 # Copy documentation
-for doc in ["README.md", "README_FOR_KIDS.md", "OBS_WEBSOCKET_SETUP.md",
-            "QUICK_TEST.md", "LICENSE", "WINDOWS_SETUP_GUIDE.md"]:
-    if os.path.exists(doc):
-        shutil.copy(doc, TEMP_DIR)
+shutil.copy("README_SIMPLE.txt", TEMP_DIR)  # Only include the simple readme
+if os.path.exists("LICENSE"):
+    shutil.copy("LICENSE", TEMP_DIR)
 
 # Remove node_modules from server
 node_modules = os.path.join(TEMP_DIR, "server", "node_modules")
