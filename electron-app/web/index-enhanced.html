@@ -429,7 +429,7 @@
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <div style="margin-bottom: 15px;">
                             <label for="obs-host" style="display: block; margin-bottom: 5px; color: #9b59b6;">Host:</label>
-                            <input type="text" id="obs-host" placeholder="localhost" value="localhost" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                            <input type="text" id="obs-host" placeholder="127.0.0.1" value="127.0.0.1" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
                         </div>
                         <div style="margin-bottom: 15px;">
                             <label for="obs-port" style="display: block; margin-bottom: 5px; color: #9b59b6;">Port:</label>
@@ -563,7 +563,7 @@
 
         // Settings functions
         async function saveObsSettings() {
-            const host = document.getElementById('obs-host').value || 'localhost';
+            const host = document.getElementById('obs-host').value || '127.0.0.1';
             const port = parseInt(document.getElementById('obs-port').value) || 4455;
             const password = document.getElementById('obs-password').value || '';
 
@@ -574,7 +574,7 @@
             };
 
             try {
-                const response = await fetch('http://localhost:3030/api/settings/obs', {
+                const response = await fetch('http://127.0.0.1:3030/api/settings/obs', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -615,7 +615,7 @@
             statusDiv.textContent = '🔄 Testing OBS connection...';
 
             try {
-                const response = await fetch('http://localhost:3030/api/obs/test-connection', {
+                const response = await fetch('http://127.0.0.1:3030/api/obs/test-connection', {
                     method: 'POST'
                 });
 
@@ -636,11 +636,11 @@
         // Load settings on page load
         async function loadObsSettings() {
             try {
-                const response = await fetch('http://localhost:3030/api/settings/obs');
+                const response = await fetch('http://127.0.0.1:3030/api/settings/obs');
                 if (response.ok) {
                     const settings = await response.json();
                     if (settings) {
-                        document.getElementById('obs-host').value = settings.host || 'localhost';
+                        document.getElementById('obs-host').value = settings.host || '127.0.0.1';
                         document.getElementById('obs-port').value = settings.port || 4455;
                         document.getElementById('obs-password').value = settings.password || '';
                     }

@@ -6,6 +6,7 @@ const { autoUpdater } = require('electron-updater');
 let mainWindow;
 let tray;
 let serverProcess;
+let obsSettingsFilePath;
 const SERVER_BASE_URL = 'http://127.0.0.1:3030';
 
 // Enable live reload for Electron
@@ -159,7 +160,11 @@ function startBackendServer() {
 
   // Use the Electron runtime as Node in packaged builds instead of relying on a system node binary.
   serverProcess = spawn(process.execPath, [serverPath], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      STREAMVOICE_OBS_SETTINGS_FILE: obsSettingsFilePath || ''
+    },
     stdio: ['pipe', 'pipe', 'pipe', 'ipc']
   });
 
@@ -230,6 +235,7 @@ autoUpdater.on('update-downloaded', () => {
 
 // App event handlers
 app.whenReady().then(() => {
+  obsSettingsFilePath = path.join(app.getPath('userData'), 'obs-settings.json');
   createWindow();
   createTray();
   startBackendServer();

@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const OBSWebSocket = require('obs-websocket-js').default;
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(cors({
@@ -23,6 +24,7 @@ const obs = new OBSWebSocket();
 // Configuration
 let OBS_WEBSOCKET_URL = 'ws://127.0.0.1:4455'; // Force IPv4 connection
 let OBS_PASSWORD = ''; // Set this if you have a password
+const OBS_SETTINGS_FILE = process.env.STREAMVOICE_OBS_SETTINGS_FILE || path.join(__dirname, 'obs-settings.json');
 
 // Settings storage (in production, use a proper database or file storage)
 let obsSettings = {
@@ -30,6 +32,34 @@ let obsSettings = {
   port: 4455,
   password: ''
 };
+
+function loadObsSettings() {
+  try {
+    if (!fs.existsSync(OBS_SETTINGS_FILE)) {
+      return;
+    }
+
+    const raw = fs.readFileSync(OBS_SETTINGS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    if (!parsed || !parsed.host || !parsed.port) {
+      return;
+    }
+
+    obsSettings = {
+      host: parsed.host,
+      port: Number(parsed.port),
+      password: parsed.password || ''
+    };
+  } catch (error) {
+    console.error('Failed to load OBS settings:', error.message);
+  }
+}
+
+function persistObsSettings() {
+  fs.mkdirSync(path.dirname(OBS_SETTINGS_FILE), { recursive: true });
+  fs.writeFileSync(OBS_SETTINGS_FILE, JSON.stringify(obsSettings, null, 2));
+}
 
 // Connection state
 let obsConnected = false;
@@ -1016,11 +1046,12 @@ app.post('/api/settings/obs', async (req, res) => {
 
   // Update settings
   obsSettings = {
-    host: host || 'localhost',
+    host: host || '127.0.0.1',
     port: parseInt(port) || 4455,
     password: password || ''
   };
 
+  persistObsSettings();
   console.log('📝 OBS settings updated:', obsSettings);
 
   // Disconnect from current connection if any
@@ -1076,6 +1107,7 @@ app.post('/api/obs/test-connection', async (req, res) => {
 
 // Start servers
 const PORT = process.env.PORT || 3030;
+loadObsSettings();
 app.listen(PORT, () => {
   console.log(`StreamVoice API running on http://localhost:${PORT}`);
   console.log(`WebSocket server running on ws://localhost:8090`);
