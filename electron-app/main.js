@@ -42,7 +42,6 @@ if (!gotTheLock) {
 }
 
 function createWindow() {
-  // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -52,22 +51,13 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    frame: false, // Custom title bar
+    frame: true,
     backgroundColor: '#0a0a0a',
-    show: false // Don't show until ready
+    show: false,
+    title: 'StreamVoice'
   });
 
-  // Load the app
-  mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
-
-  // Show window when ready AND server is running
-  mainWindow.once('ready-to-show', () => {
-    // Give server time to start
-    setTimeout(() => {
-      mainWindow.show();
-      checkForUpdates();
-    }, 2000); // 2 second delay for server startup
-  });
+  loadStartupScreen('Starting StreamVoice...', 'Launching local backend and connecting to OBS.');
 
   // Minimize to tray instead of closing
   mainWindow.on('close', (event) => {
@@ -93,6 +83,80 @@ function createWindow() {
   ipcMain.on('window-close', () => {
     mainWindow.hide();
   });
+}
+
+function loadStartupScreen(title, detail) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const html = `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8">
+      <title>StreamVoice</title>
+      <style>
+        body {
+          margin: 0;
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          background: #0f1116;
+          color: #f4f7fb;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .panel {
+          width: min(560px, calc(100vw - 48px));
+          padding: 28px 32px;
+          border-radius: 16px;
+          background: linear-gradient(180deg, rgba(29, 34, 43, 0.96), rgba(16, 19, 25, 0.98));
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        h1 {
+          margin: 0 0 8px;
+          font-size: 28px;
+        }
+        p {
+          margin: 0;
+          color: #a9b4c2;
+          line-height: 1.5;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="panel">
+        <h1>${title}</h1>
+        <p>${detail}</p>
+      </div>
+    </body>
+  </html>`;
+
+  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
+async function loadEnhancedApp(maxAttempts = 30) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const baseUrl = await resolveServerBaseUrl(true);
+      await mainWindow.loadURL(`${baseUrl}/index-enhanced.html`);
+      mainWindow.show();
+      checkForUpdates();
+      return;
+    } catch (error) {
+      loadStartupScreen(
+        'Starting StreamVoice...',
+        `Waiting for local services (${attempt}/${maxAttempts}). ${error.message}`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  loadStartupScreen(
+    'StreamVoice Could Not Start',
+    'The local backend did not become reachable. Restart the app and check the packaged backend log.'
+  );
+  mainWindow.show();
 }
 
 function createTray() {
@@ -130,7 +194,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.0.16',
+          message: 'StreamVoice v1.0.17',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -212,12 +276,11 @@ function startBackendServer() {
     }
   });
 
-  // Give the server time to start
   setTimeout(() => {
     if (mainWindow) {
-      mainWindow.webContents.send('server-started');
+      loadEnhancedApp();
     }
-  }, 2000);
+  }, 500);
 }
 
 function appendBackendLog(message) {
