@@ -229,7 +229,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.2',
+          message: 'StreamVoice v1.1.0-alpha.3',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -437,6 +437,25 @@ function broadcastDesktopStatus() {
   }
 }
 
+function updateDesktopSubsystemHealth(subsystem, status, extra = {}) {
+  if (subsystem === 'speech') {
+    desktopObsState.speech = {
+      ...(desktopObsState.speech || {}),
+      status,
+      engine: 'WebSpeechAPI',
+      ...extra
+    };
+  }
+
+  if (subsystem === 'microphone') {
+    desktopObsState.microphone = {
+      ...(desktopObsState.microphone || {}),
+      status,
+      ...extra
+    };
+  }
+}
+
 async function getDesktopSceneState() {
   const { scenes, currentProgramSceneName } = await desktopObs.call('GetSceneList');
   return {
@@ -520,6 +539,24 @@ async function desktopStartStreaming() {
   return { success: true, message: 'Stream started' };
 }
 
+async function desktopStopStreaming() {
+  const { outputActive } = await desktopObs.call('GetStreamStatus');
+  if (!outputActive) {
+    return { success: false, message: 'Not streaming' };
+  }
+  await desktopObs.call('StopStream');
+  return { success: true, message: 'Stream stopped' };
+}
+
+async function desktopStopRecording() {
+  const { outputActive } = await desktopObs.call('GetRecordStatus');
+  if (!outputActive) {
+    return { success: false, message: 'Not recording' };
+  }
+  await desktopObs.call('StopRecord');
+  return { success: true, message: 'Recording stopped' };
+}
+
 async function executeDesktopCommand(command) {
   const normalized = String(command || '').trim().toLowerCase();
   let result;
@@ -549,6 +586,17 @@ async function executeDesktopCommand(command) {
   } else if (normalized === 'stream starting setup') {
     result = await desktopSwitchToScene('starting');
     result.message = 'Stream starting setup triggered';
+  } else if (normalized === 'stream ending setup') {
+    try {
+      await desktopSwitchToScene('ending');
+    } catch (_error) {}
+    try {
+      await desktopStopStreaming();
+    } catch (_error) {}
+    try {
+      await desktopStopRecording();
+    } catch (_error) {}
+    result = { success: true, message: 'Stream ending setup triggered' };
   } else if (normalized === 'raid mode') {
     result = await desktopSwitchToScene('raid');
     result.message = 'Raid mode activated';
@@ -787,7 +835,20 @@ ipcMain.handle('desktop-get-status', () => {
 });
 
 ipcMain.handle('desktop-get-health', () => {
-  return getDesktopHealthStatus();
+  const health = getDesktopHealthStatus();
+  if (desktopObsState.speech) {
+    health.subsystems.speech = {
+      ...health.subsystems.speech,
+      ...desktopObsState.speech
+    };
+  }
+  if (desktopObsState.microphone) {
+    health.subsystems.microphone = {
+      ...health.subsystems.microphone,
+      ...desktopObsState.microphone
+    };
+  }
+  return health;
 });
 
 ipcMain.handle('desktop-get-command-history', () => {
@@ -851,6 +912,11 @@ ipcMain.handle('desktop-execute-command', async (_event, command) => {
       error: error.message
     };
   }
+});
+
+ipcMain.handle('desktop-update-subsystem-health', (_event, payload) => {
+  updateDesktopSubsystemHealth(payload.subsystem, payload.status, payload.extra || {});
+  return { success: true };
 });
 
 ipcMain.handle('get-server-base-url', async () => {

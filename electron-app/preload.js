@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     desktopGetStatus: () => ipcRenderer.invoke('desktop-get-status'),
     desktopSaveObsSettings: (settings) => ipcRenderer.invoke('desktop-save-obs-settings', settings),
     desktopTestObsConnection: () => ipcRenderer.invoke('desktop-test-obs-connection'),
+    desktopUpdateSubsystemHealth: (payload) => ipcRenderer.invoke('desktop-update-subsystem-health', payload),
     getServerBaseUrl: () => ipcRenderer.invoke('get-server-base-url'),
     getBackendLogTail: () => ipcRenderer.invoke('get-backend-log-tail'),
     onDesktopStatusUpdated: (callback) => ipcRenderer.on('desktop-status-updated', (_event, status) => callback(status)),

@@ -546,7 +546,7 @@ class StreamVoiceEnhanced {
                 recording: ['start recording'],
                 streaming: ['start streaming'],
                 audio: ['mute mic', 'unmute mic'],
-                macros: ['stream starting setup', 'emergency mute', 'raid mode', 'subscriber celebration'],
+                macros: ['stream starting setup', 'stream ending setup', 'emergency mute', 'raid mode', 'subscriber celebration'],
                 other: ['take screenshot']
             });
             return;
@@ -626,6 +626,13 @@ class StreamVoiceEnhanced {
                 subsystem: subsystem,
                 status: status
             }));
+        }
+
+        if (this.hasDesktopBridge && window.electronAPI?.desktopUpdateSubsystemHealth) {
+            window.electronAPI.desktopUpdateSubsystemHealth({
+                subsystem,
+                status
+            }).catch(() => {});
         }
 
         // Update local UI immediately
