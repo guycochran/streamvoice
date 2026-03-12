@@ -208,9 +208,34 @@ app.on('activate', () => {
   }
 });
 
+// Store for settings
+let appSettings = {
+  startWithWindows: false,
+  minimizeToTray: true,
+  autoConnect: true
+};
+
 // IPC handlers for renderer
 ipcMain.handle('get-version', () => {
   return app.getVersion();
+});
+
+ipcMain.handle('get-settings', () => {
+  return appSettings;
+});
+
+ipcMain.handle('save-settings', (event, settings) => {
+  appSettings = { ...appSettings, ...settings };
+
+  // Update start with Windows setting
+  if (settings.startWithWindows !== undefined) {
+    app.setLoginItemSettings({
+      openAtLogin: settings.startWithWindows,
+      openAsHidden: settings.startWithWindows
+    });
+  }
+
+  return appSettings;
 });
 
 ipcMain.handle('check-obs-connection', async () => {
@@ -221,4 +246,26 @@ ipcMain.handle('check-obs-connection', async () => {
   } catch (error) {
     return { connected: false };
   }
+});
+
+ipcMain.handle('voice-command', async (event, command) => {
+  // Send command to server
+  try {
+    const response = await fetch('http://localhost:3030/api/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command })
+    });
+    return await response.json();
+  } catch (error) {
+    return { error: error.message };
+  }
+});
+
+ipcMain.handle('open-external', (event, url) => {
+  shell.openExternal(url);
+});
+
+ipcMain.handle('show-item-in-folder', (event, path) => {
+  shell.showItemInFolder(path);
 });
