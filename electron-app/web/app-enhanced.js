@@ -31,7 +31,7 @@ class StreamVoiceEnhanced {
     }
 
     connectWebSocket() {
-        const wsUrl = 'ws://localhost:8090';
+        const wsUrl = 'ws://127.0.0.1:8090';  // Force IPv4 connection
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
