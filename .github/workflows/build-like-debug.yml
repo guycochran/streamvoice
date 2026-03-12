@@ -1,0 +1,87 @@
+name: Build Like Debug
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Create fresh package.json
+      working-directory: electron-app
+      run: |
+        # Back up original
+        Copy-Item package.json package.json.backup
+
+        # Create fresh minimal package.json
+        npm init -y
+
+        # Read original to get metadata
+        $original = Get-Content package.json.backup | ConvertFrom-Json
+
+        # Create new package.json with build config
+        $newPackage = @{
+          name = "streamvoice"
+          version = "1.0.0"
+          description = "Professional voice control for OBS Studio"
+          main = "main.js"
+          scripts = @{
+            start = "electron ."
+            "build-win" = "electron-builder --win"
+          }
+          author = "StreamVoice Team"
+          license = "MIT"
+          build = @{
+            appId = "com.streamvoice.app"
+            productName = "StreamVoice"
+            directories = @{
+              output = "dist"
+            }
+            win = @{
+              target = "nsis"
+            }
+            nsis = @{
+              artifactName = "StreamVoice-Setup-`${version}.exe"
+            }
+          }
+        }
+
+        $newPackage | ConvertTo-Json -Depth 10 | Out-File -Encoding UTF8 package.json
+
+    - name: Install dependencies individually
+      working-directory: electron-app
+      run: |
+        echo "=== Installing production deps ==="
+        npm install express --save
+        npm install obs-websocket-js --save
+        npm install electron-updater --save
+
+        echo "=== Installing dev deps ==="
+        npm install electron --save-dev
+        npm install electron-builder --save-dev
+
+    - name: Build
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: |
+        echo "=== Building ==="
+        npm run build-win -- --publish never
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: like-debug-build
+        path: |
+          electron-app/dist/
+          electron-app/*.log

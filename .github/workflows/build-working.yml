@@ -1,0 +1,44 @@
+name: Build Working
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Clean install without postinstall
+      working-directory: electron-app
+      run: |
+        # Remove postinstall script that might be causing issues
+        $packageJson = Get-Content package.json | ConvertFrom-Json
+        $packageJson.PSObject.Properties.Remove('postinstall')
+        $packageJson | ConvertTo-Json -Depth 10 | Out-File -Encoding UTF8 package.json
+
+        # Clean install
+        npm install
+
+    - name: Install app-deps manually
+      working-directory: electron-app
+      run: npx electron-builder install-app-deps
+
+    - name: Build
+      working-directory: electron-app
+      env:
+        CSC_IDENTITY_AUTO_DISCOVERY: false
+      run: npx electron-builder --win --publish never
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: working-build
+        path: electron-app/dist/*.exe
