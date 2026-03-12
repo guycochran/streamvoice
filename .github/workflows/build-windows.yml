@@ -1,20 +1,16 @@
-name: Build Electron App
+name: Build Windows Installer
 
 on:
   push:
     branches: [ main ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
 
     steps:
-    - name: Check out code
+    - name: Checkout code
       uses: actions/checkout@v3
 
     - name: Setup Node.js
@@ -24,33 +20,24 @@ jobs:
 
     - name: Install dependencies
       working-directory: electron-app
-      run: npm ci --force || npm install --force
+      run: npm ci --force
 
-    - name: Build Electron app
+    - name: Build Windows installer
       working-directory: electron-app
       run: npm run build-win
 
-    - name: Upload Windows artifacts
+    - name: Upload installer
       uses: actions/upload-artifact@v3
       with:
-        name: StreamVoice-Windows
-        path: electron-app/dist/*.exe
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
+        name: StreamVoice-Setup
+        path: electron-app/dist/StreamVoice-Setup-*.exe
 
     - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
-        files: StreamVoice-Windows/*.exe
+        files: electron-app/dist/StreamVoice-Setup-*.exe
         draft: false
         prerelease: false
-        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
