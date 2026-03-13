@@ -507,7 +507,7 @@ class StreamVoiceEnhanced {
 
         if (window.electronAPI?.speechSubmitAudio) {
             const response = await window.electronAPI.speechSubmitAudio({
-                audioBytes: Array.from(wavBytes),
+                audioBytes: wavBytes,
                 mimeType: 'audio/wav',
                 durationMs: Date.now() - startedAt
             });
