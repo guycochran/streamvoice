@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.4',
+          message: 'StreamVoice v1.1.0-beta.5',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -570,7 +570,8 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
   const whisperResult = await transcribeWithWhisper({
     audioPath: filePath,
     appRoot: __dirname,
-    userDataPath: app.getPath('userData')
+    userDataPath: app.getPath('userData'),
+    modelPreference: appSettings.speechCommandModel || 'tiny.en'
   });
   speechService.recordWhisperDiagnostics(whisperResult);
   const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
@@ -611,7 +612,8 @@ async function processSpeechAudioFile(filePath, payload = {}) {
   const whisperResult = await transcribeWithWhisper({
     audioPath: filePath,
     appRoot: __dirname,
-    userDataPath: app.getPath('userData')
+    userDataPath: app.getPath('userData'),
+    modelPreference: appSettings.speechCommandModel || 'tiny.en'
   });
   speechService.recordWhisperDiagnostics(whisperResult);
   const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
@@ -804,7 +806,8 @@ function syncSpeechCaptureMonitor() {
 function updateSpeechRuntimeConfig() {
   const config = resolveWhisperConfig({
     appRoot: __dirname,
-    userDataPath: app.getPath('userData')
+    userDataPath: app.getPath('userData'),
+    modelPreference: appSettings.speechCommandModel || 'tiny.en'
   });
 
   speechService.setMode(appSettings.speechInputMode || 'push_to_talk');
@@ -812,6 +815,9 @@ function updateSpeechRuntimeConfig() {
     binaryPath: config.binaryPath,
     modelPath: config.modelPath,
     modelStatus: config.binaryPath && config.modelPath ? 'ready' : 'not_installed'
+  });
+  speechService.setState({
+    model: appSettings.speechCommandModel || 'tiny.en'
   });
 }
 
@@ -1356,6 +1362,7 @@ let appSettings = {
   minimizeToTray: true,
   autoConnect: true,
   speechInputMode: 'push_to_talk',
+  speechCommandModel: 'tiny.en',
   voiceHotkey: '',
   preferredMicDeviceId: '',
   preferredMicLabel: '',
@@ -1625,7 +1632,8 @@ ipcMain.handle('speech-preview-audio', async (_event, payload) => {
       audioPath: filePath,
       appRoot: __dirname,
       userDataPath: app.getPath('userData'),
-      timeoutMs: 7000
+      timeoutMs: 7000,
+      modelPreference: appSettings.speechCommandModel || 'tiny.en'
     });
     const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
 

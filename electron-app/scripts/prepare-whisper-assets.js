@@ -5,15 +5,22 @@ const os = require('os');
 const { spawn } = require('child_process');
 
 const WHISPER_VERSION = 'v1.8.2';
-const MODEL_NAME = 'ggml-base.en.bin';
-const MODEL_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true';
+const MODELS = [
+  {
+    name: 'ggml-base.en.bin',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true'
+  },
+  {
+    name: 'ggml-tiny.en.bin',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin?download=true'
+  }
+];
 const SOURCE_ZIP_URL = `https://github.com/ggml-org/whisper.cpp/archive/refs/tags/${WHISPER_VERSION}.zip`;
 
 const appRoot = path.resolve(__dirname, '..');
 const vendorRoot = path.join(appRoot, 'vendor', 'whisper');
 const vendorModelDir = path.join(vendorRoot, 'models');
 const vendorBinaryPath = path.join(vendorRoot, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
-const vendorModelPath = path.join(vendorModelDir, MODEL_NAME);
 const cacheRoot = path.join(appRoot, '.cache', 'whisper');
 
 function run(command, args, options = {}) {
@@ -127,20 +134,23 @@ async function buildWhisperCli() {
   }
 }
 
-async function ensureModel() {
+async function ensureModels() {
   await ensureDir(vendorModelDir);
 
-  if (fs.existsSync(vendorModelPath)) {
-    return;
-  }
+  for (const model of MODELS) {
+    const destinationPath = path.join(vendorModelDir, model.name);
+    if (fs.existsSync(destinationPath)) {
+      continue;
+    }
 
-  console.log(`Downloading ${MODEL_NAME}...`);
-  await downloadFile(MODEL_URL, vendorModelPath);
+    console.log(`Downloading ${model.name}...`);
+    await downloadFile(model.url, destinationPath);
+  }
 }
 
 async function main() {
   await ensureDir(vendorRoot);
-  await ensureModel();
+  await ensureModels();
 
   if (!fs.existsSync(vendorBinaryPath)) {
     await buildWhisperCli();
@@ -148,7 +158,7 @@ async function main() {
 
   console.log(`Whisper assets ready:
   Binary: ${vendorBinaryPath}
-  Model: ${vendorModelPath}`);
+  Models: ${MODELS.map((model) => path.join(vendorModelDir, model.name)).join(', ')}`);
 }
 
 main().catch((error) => {
