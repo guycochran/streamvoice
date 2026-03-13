@@ -1,63 +1,108 @@
 # Voice Handoff - March 14, 2026
 
-## Critical Fix Applied - v1.1.0-alpha.30
+## Current State
 
-### Problem Identified
-The speech capture was failing because the audio data (Uint8Array) was not surviving IPC serialization between the hidden capture window and the main process. The `submitAudio` IPC call was failing silently in packaged builds.
+Voice is still not working in packaged Windows builds.
 
-### Solution Implemented
-1. **Array Conversion for IPC**: Modified speech-capture.html to convert Uint8Array to regular Array before IPC submission
-   - Changed `audioBytes` to `Array.from(audioBytes)` for both preview and final submission
-   - This ensures the data can be properly serialized across the IPC boundary
+What does work:
+- OBS desktop IPC path works
+- OBS scene inventory populates
+- mic selection works
+- VU metering works
+- Whisper binary/model bundle is present and detected
+- the app can show real speech diagnostics
 
-2. **Enhanced Error Handling**: Added detailed error catching and reporting
-   - Wrapped submitAudio in try-catch with specific error messages
-   - Added console.error logging for debugging
-   - Report specific IPC submission failures to diagnostics
+What does not work:
+- press-to-talk does not complete end-to-end reliably
+- transcripts do not appear
+- commands are not being executed from speech
 
-### Files Modified
-- `/electron-app/speech-capture.html` - Fixed audio byte array conversion and error handling
-- `/electron-app/package.json` - Version bump to 1.1.0-alpha.30
-- `/electron-app/main.js` - Version update in About dialog
+## Latest Important Commits
 
-### Key Changes in speech-capture.html
+- `ba165b4` `Fix audio IPC serialization in speech capture - v1.1.0-alpha.30`
+- `84b3056` `Replace voice capture path in renderer`
+- `117ac12` `Rollback unstable renderer voice capture`
 
-```javascript
-// Before - IPC serialization was failing silently
-await window.speechCaptureAPI.submitAudio({
-  audioBytes,  // Uint8Array doesn't serialize properly
-  mimeType: 'audio/wav',
-  durationMs: Date.now() - startedAt
-});
+`84b3056` was an attempted replacement of the hidden capture-window path with direct renderer capture. It caused the UI to go black on mic release and was rolled back by `117ac12`.
 
-// After - Convert to regular array for IPC
-const audioArray = Array.from(audioBytes);
-const submitResult = await window.speechCaptureAPI.submitAudio({
-  audioBytes: audioArray,  // Regular array serializes correctly
-  mimeType: 'audio/wav',
-  durationMs: Date.now() - startedAt
-});
-```
+Current safe recovery point is:
+- `117ac12`
+- app version `1.1.0-alpha.32`
 
-### Expected Behavior After Fix
-1. Audio capture chunks will be collected (as before)
-2. WAV conversion will complete (as before)
-3. IPC submission will now succeed with proper array serialization
-4. Main process will receive the audio data
-5. Whisper will transcribe the audio
-6. Commands will execute
+## What We Learned
 
-### Testing Instructions for v1.1.0-alpha.30
-1. Build and package the application
-2. Test on Windows with the packaged build
-3. Check diagnostics for:
-   - `Capture Phase` should progress beyond "starting"
-   - `Last Audio Path` should show a file path (not "none")
-   - `Last Whisper Duration` should show a time value
-   - `Heard:` should show the transcribed text
+### Confirmed Good
 
-### If This Fix Doesn't Work
-If alpha.30 still fails with the same symptoms, the next step should be to replace the hidden BrowserWindow MediaRecorder approach entirely with a native audio capture solution in the main process. The IPC boundary is proving to be too fragile for reliable audio data transfer in packaged builds.
+- OBS connection is not the blocker
+- Whisper installation/runtime detection is not the blocker
+- microphone selection and input monitoring are not the blocker
 
-### Technical Note
-The root cause was that Electron's IPC uses structured cloning for data transfer, and Uint8Array objects were not being properly serialized in the packaged environment. Converting to a regular JavaScript array ensures compatibility with the IPC serialization mechanism.
+### Confirmed Bad
+
+- browser/renderer capture experiments are not stable enough
+- the hidden BrowserWindow capture path is fragile
+- the direct visible-renderer capture replacement was worse and regressed the UI
+
+### Strongest Diagnostic Evidence
+
+Before the rollback, diagnostics consistently showed:
+- live VU movement
+- selected mic label populated correctly
+- `Last Audio Size` non-zero
+- `Capture Chunks` non-zero
+
+But also:
+- `Last Audio Path: none`
+- `Last Whisper Duration: unknown`
+- `Last Transcript: none`
+
+That means the failure is in the capture finalization / submission path before successful Whisper transcription completes.
+
+## Do Not Waste More Time On
+
+- patching Web Speech API
+- more hidden BrowserWindow `MediaRecorder` tweaks
+- more visible-renderer `MediaRecorder` tweaks
+- more IPC payload-shape experiments by themselves
+
+The codebase has already spent too many cycles there.
+
+## Recommended Next Step
+
+Replace the current capture mechanism with a native/main-process audio capture path.
+
+Target architecture:
+- Electron main owns speech state
+- Electron main owns audio capture
+- Electron main writes the captured WAV file directly
+- Electron main invokes Whisper directly on that file
+- renderer only shows:
+  - listening
+  - transcribing
+  - heard transcript
+  - command result
+
+Do not put the main app UI renderer in the critical recording path.
+
+## Files To Read First
+
+- [main.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/main.js)
+- [speech-service.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/services/speech-service.js)
+- [whisper-runner.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/services/whisper-runner.js)
+- [speech-capture.html](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/speech-capture.html)
+- [app-enhanced.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/web/app-enhanced.js)
+
+## Practical Success Definition
+
+The next LLM should consider the task complete only when all of these are true in a packaged Windows build:
+
+- pressing the mic button does not blank the UI
+- mic capture completes
+- `Last Audio Path` becomes a real file path
+- `Last Whisper Duration` gets a real value
+- a transcript appears under `Heard:`
+- a short command like `mute mic` executes in OBS
+
+## Blunt Recommendation
+
+Treat native/main-process capture as the primary plan, not the fallback plan.
