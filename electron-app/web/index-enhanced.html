@@ -474,7 +474,15 @@
                             <input type="text" id="voice-hotkey" placeholder="Ctrl+Shift+V" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;">
                         </div>
                         <div id="voice-hotkey-status" style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
-                            Enter an Electron shortcut like <code>Ctrl+Shift+V</code>. Press once to start listening, press again to transcribe.
+                            Click the field and press your shortcut. Press once to start listening, press again to transcribe.
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="macro-button" onclick="saveAppPreferences()" style="background: #8e44ad; padding: 10px 20px;">
+                                💾 Save Voice Hotkey
+                            </button>
+                            <button class="macro-button" onclick="clearVoiceHotkey()" style="background: #7f8c8d; padding: 10px 20px;">
+                                ⌫ Clear Hotkey
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -851,6 +859,69 @@
             }
         }
 
+        function normalizeHotkeyEvent(event) {
+            const modifiers = [];
+            if (event.ctrlKey) modifiers.push('Ctrl');
+            if (event.altKey) modifiers.push('Alt');
+            if (event.shiftKey) modifiers.push('Shift');
+            if (event.metaKey) modifiers.push('Super');
+
+            const key = event.key;
+            if (!key) {
+                return '';
+            }
+
+            const ignoredKeys = new Set(['Control', 'Shift', 'Alt', 'Meta']);
+            if (ignoredKeys.has(key)) {
+                return modifiers.join('+');
+            }
+
+            let normalizedKey = key.length === 1 ? key.toUpperCase() : key;
+            const aliases = {
+                ' ': 'Space',
+                Escape: 'Esc',
+                ArrowUp: 'Up',
+                ArrowDown: 'Down',
+                ArrowLeft: 'Left',
+                ArrowRight: 'Right'
+            };
+            normalizedKey = aliases[normalizedKey] || normalizedKey;
+
+            return [...modifiers, normalizedKey].join('+');
+        }
+
+        function setupVoiceHotkeyCapture() {
+            const hotkeyInput = document.getElementById('voice-hotkey');
+            const hotkeyStatus = document.getElementById('voice-hotkey-status');
+            if (!hotkeyInput) {
+                return;
+            }
+
+            hotkeyInput.addEventListener('keydown', (event) => {
+                event.preventDefault();
+                const combo = normalizeHotkeyEvent(event);
+                if (!combo) {
+                    return;
+                }
+
+                hotkeyInput.value = combo;
+                if (hotkeyStatus) {
+                    hotkeyStatus.textContent = `Captured hotkey: ${combo}. Click save to register it globally.`;
+                }
+            });
+        }
+
+        function clearVoiceHotkey() {
+            const hotkeyInput = document.getElementById('voice-hotkey');
+            const hotkeyStatus = document.getElementById('voice-hotkey-status');
+            if (hotkeyInput) {
+                hotkeyInput.value = '';
+            }
+            if (hotkeyStatus) {
+                hotkeyStatus.textContent = 'Global voice hotkey cleared. Click save to remove it.';
+            }
+        }
+
         async function testObsConnection() {
             const statusDiv = document.getElementById('settings-status');
             statusDiv.style.display = 'block';
@@ -930,6 +1001,7 @@
 
         // Load settings when page loads
         window.addEventListener('DOMContentLoaded', () => {
+            setupVoiceHotkeyCapture();
             loadObsSettings();
             setInterval(() => {
                 refreshSceneMappingOptions(window.electronAPI?.getSettings ? undefined : {});
