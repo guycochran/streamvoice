@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, shell, ipcMain, dialog, globalShortcut } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const OBSWebSocket = require('obs-websocket-js').default;
@@ -19,6 +19,7 @@ let backendLogFilePath;
 let speechCaptureDirPath;
 const speechUploadSessions = new Map();
 let nativeSpeechCaptureService;
+let registeredVoiceHotkey = null;
 let desktopObsReconnectTimer = null;
 let latestSpeechPreviewSequence = 0;
 const speechService = new SpeechService();
@@ -261,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.1',
+          message: 'StreamVoice v1.1.0-beta.2',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -381,6 +382,135 @@ function getNativeSpeechCaptureService() {
 
 function shouldUseNativeSpeechCapture() {
   return getNativeSpeechCaptureService().isSupported();
+}
+
+async function startSpeechCaptureFlow() {
+  const currentState = speechService.getState();
+  if (currentState.recording || currentState.transcribing) {
+    return { success: true, state: currentState };
+  }
+
+  const state = speechService.startPushToTalk();
+  broadcastSpeechState();
+
+  if (shouldUseNativeSpeechCapture()) {
+    try {
+      await getNativeSpeechCaptureService().startRecording({
+        deviceId: appSettings.preferredMicDeviceId || '',
+        deviceLabel: appSettings.preferredMicLabel || ''
+      });
+      speechService.updateCaptureTelemetry({
+        capturePhase: 'native_recording',
+        lastError: null
+      });
+      broadcastSpeechState();
+      return { success: true, state: speechService.getState() };
+    } catch (error) {
+      const failedState = speechService.fail(error);
+      broadcastSpeechState();
+      return {
+        success: false,
+        error: error.message,
+        state: failedState
+      };
+    }
+  }
+
+  const captureConfig = {
+    deviceId: appSettings.preferredMicDeviceId || ''
+  };
+  speechCaptureWindow?.webContents.send('speech-capture-start', captureConfig);
+  speechCaptureWindow?.webContents.executeJavaScript(`
+    window.__streamvoiceStartCapture && window.__streamvoiceStartCapture(${JSON.stringify(captureConfig)});
+  `).catch(() => {});
+  return { success: true, state };
+}
+
+async function stopSpeechCaptureFlow() {
+  const currentState = speechService.getState();
+  if (!currentState.recording && !currentState.transcribing) {
+    return { success: true, state: currentState };
+  }
+
+  const state = speechService.stopPushToTalk();
+  broadcastSpeechState();
+
+  if (shouldUseNativeSpeechCapture()) {
+    try {
+      speechService.updateCaptureTelemetry({
+        capturePhase: 'native_finalizing'
+      });
+      broadcastSpeechState();
+
+      const captureResult = await getNativeSpeechCaptureService().stopRecording();
+      speechService.recordWhisperDiagnostics({
+        stderr: captureResult.stderr || ''
+      });
+      speechService.updateCaptureTelemetry({
+        capturePhase: 'native_recorded',
+        lastAudioBytes: captureResult.byteLength,
+        lastAudioMimeType: 'audio/wav'
+      });
+      broadcastSpeechState();
+
+      return await processSpeechAudioFile(captureResult.filePath, {
+        durationMs: captureResult.durationMs,
+        mimeType: 'audio/wav'
+      });
+    } catch (error) {
+      const failedState = speechService.fail(error);
+      broadcastSpeechState();
+      return {
+        success: false,
+        error: error.message,
+        state: failedState
+      };
+    }
+  }
+
+  speechCaptureWindow?.webContents.send('speech-capture-stop');
+  speechCaptureWindow?.webContents.executeJavaScript(`
+    window.__streamvoiceStopCapture && window.__streamvoiceStopCapture();
+  `).catch(() => {});
+  return { success: true, state };
+}
+
+function registerVoiceHotkey() {
+  if (!app.isReady()) {
+    return;
+  }
+
+  if (registeredVoiceHotkey) {
+    globalShortcut.unregister(registeredVoiceHotkey);
+    registeredVoiceHotkey = null;
+  }
+
+  const accelerator = String(appSettings.voiceHotkey || '').trim();
+  if (!accelerator) {
+    return;
+  }
+
+  try {
+    const registered = globalShortcut.register(accelerator, async () => {
+      const speechState = speechService.getState();
+      if (speechState.recording) {
+        await stopSpeechCaptureFlow();
+      } else if (!speechState.transcribing) {
+        await startSpeechCaptureFlow();
+      }
+    });
+
+    if (!registered) {
+      throw new Error(`Failed to register hotkey "${accelerator}"`);
+    }
+
+    registeredVoiceHotkey = accelerator;
+  } catch (error) {
+    speechService.updateCaptureTelemetry({
+      lastError: `Hotkey error: ${error.message}`
+    });
+    broadcastSpeechState();
+  }
 }
 
 async function persistSpeechCapture(audioBytes, metadata = {}) {
@@ -1187,6 +1317,7 @@ app.whenReady().then(() => {
   loadAppSettings();
   speechService.initialize();
   updateSpeechRuntimeConfig();
+  registerVoiceHotkey();
   createWindow();
   createSpeechCaptureWindow();
   createTray();
@@ -1201,6 +1332,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  globalShortcut.unregisterAll();
   // Kill the server process
   if (serverProcess) {
     serverProcess.kill();
@@ -1224,6 +1356,7 @@ let appSettings = {
   minimizeToTray: true,
   autoConnect: true,
   speechInputMode: 'push_to_talk',
+  voiceHotkey: '',
   preferredMicDeviceId: '',
   preferredMicLabel: '',
   sceneMappings: {
@@ -1356,76 +1489,12 @@ ipcMain.handle('speech-get-state', () => {
   return speechService.getState();
 });
 
-ipcMain.handle('speech-start-push-to-talk', () => {
-  const state = speechService.startPushToTalk();
-  broadcastSpeechState();
-  if (shouldUseNativeSpeechCapture()) {
-    getNativeSpeechCaptureService().startRecording({
-      deviceLabel: appSettings.preferredMicLabel || ''
-    }).then(() => {
-      speechService.updateCaptureTelemetry({
-        capturePhase: 'native_recording',
-        lastError: null
-      });
-      broadcastSpeechState();
-    }).catch((error) => {
-      speechService.fail(error);
-      broadcastSpeechState();
-    });
-    return state;
-  }
-
-  const captureConfig = {
-    deviceId: appSettings.preferredMicDeviceId || ''
-  };
-  speechCaptureWindow?.webContents.send('speech-capture-start', captureConfig);
-  speechCaptureWindow?.webContents.executeJavaScript(`
-    window.__streamvoiceStartCapture && window.__streamvoiceStartCapture(${JSON.stringify(captureConfig)});
-  `).catch(() => {});
-  return state;
+ipcMain.handle('speech-start-push-to-talk', async () => {
+  return await startSpeechCaptureFlow();
 });
 
 ipcMain.handle('speech-stop-push-to-talk', async () => {
-  const state = speechService.stopPushToTalk();
-  broadcastSpeechState();
-  if (shouldUseNativeSpeechCapture()) {
-    try {
-      speechService.updateCaptureTelemetry({
-        capturePhase: 'native_finalizing'
-      });
-      broadcastSpeechState();
-
-      const captureResult = await getNativeSpeechCaptureService().stopRecording();
-      speechService.recordWhisperDiagnostics({
-        stderr: captureResult.stderr || ''
-      });
-      speechService.updateCaptureTelemetry({
-        capturePhase: 'native_recorded',
-        lastAudioBytes: captureResult.byteLength,
-        lastAudioMimeType: 'audio/wav'
-      });
-      broadcastSpeechState();
-
-      return await processSpeechAudioFile(captureResult.filePath, {
-        durationMs: captureResult.durationMs,
-        mimeType: 'audio/wav'
-      });
-    } catch (error) {
-      const failedState = speechService.fail(error);
-      broadcastSpeechState();
-      return {
-        success: false,
-        error: error.message,
-        state: failedState
-      };
-    }
-  }
-
-  speechCaptureWindow?.webContents.send('speech-capture-stop');
-  speechCaptureWindow?.webContents.executeJavaScript(`
-    window.__streamvoiceStopCapture && window.__streamvoiceStopCapture();
-  `).catch(() => {});
-  return state;
+  return await stopSpeechCaptureFlow();
 });
 
 ipcMain.on('speech-capture-error', (_event, message) => {
@@ -1622,6 +1691,10 @@ ipcMain.handle('save-settings', (event, settings) => {
   if (Object.prototype.hasOwnProperty.call(settings, 'speechInputMode')) {
     speechService.setMode(appSettings.speechInputMode || 'push_to_talk');
     broadcastSpeechState();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(settings, 'voiceHotkey')) {
+    registerVoiceHotkey();
   }
 
   persistAppSettings();
