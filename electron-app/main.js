@@ -544,13 +544,18 @@ async function trimSilenceFromWav(filePath, options = {}) {
   const channels = raw.readUInt16LE(22);
   const sampleRate = raw.readUInt32LE(24);
   const bitsPerSample = raw.readUInt16LE(34);
-  const dataSize = raw.readUInt32LE(40);
+  const declaredDataSize = raw.readUInt32LE(40);
+  const availableDataSize = Math.max(0, raw.length - 44);
+  const dataSize = Math.min(declaredDataSize, availableDataSize);
 
   if (audioFormat !== 1 || channels !== 1 || bitsPerSample !== 16 || sampleRate !== 16000) {
     return filePath;
   }
 
   const sampleCount = Math.floor(dataSize / 2);
+  if (sampleCount <= 0) {
+    return filePath;
+  }
   let startSample = 0;
   let endSample = sampleCount - 1;
 
