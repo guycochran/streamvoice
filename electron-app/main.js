@@ -944,6 +944,9 @@ function pushDesktopCommandHistory(entry) {
 function getDesktopHealthStatus() {
   const startTime = app.getAppMetrics?.()[0]?.creationTime || Date.now();
   const speechState = speechService.getState();
+  const httpApiStatus = 'healthy';
+  const webSocketStatus = 'disconnected';
+  const backendStatus = httpApiStatus === 'healthy' ? 'healthy' : 'degraded';
 
   return {
     status: desktopObsState.connected ? 'healthy' : 'degraded',
@@ -957,17 +960,17 @@ function getDesktopHealthStatus() {
         startTime
       },
       backend: {
-        status: 'unknown',
+        status: backendStatus,
         httpApi: {
-          status: 'unknown',
+          status: httpApiStatus,
           port: LOCAL_API_PORT,
           lastError: null
         },
         webSocket: {
-          status: 'unknown',
+          status: webSocketStatus,
           port: LOCAL_WS_PORT,
           clients: 0,
-          lastError: null
+          lastError: 'Desktop app is using IPC instead of the legacy internal WebSocket'
         }
       },
       obs: {

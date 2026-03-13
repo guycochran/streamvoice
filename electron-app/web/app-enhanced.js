@@ -850,21 +850,25 @@ class StreamVoiceEnhanced {
             platform.textContent = navigator.platform || 'Electron';
         }
 
-        setValue('backend-health', backendHealth.status || 'unknown', backendHealth.status || 'unknown');
+        const backendStatusValue = backendHealth.status || (this.serverReachable ? 'healthy' : 'degraded');
+        const httpApiStatusValue = backendHealth.httpApi?.status || (this.serverReachable ? 'healthy' : 'error');
+        const webSocketStatusValue = backendHealth.webSocket?.status || (this.wsConnected ? 'healthy' : 'disconnected');
+
+        setValue('backend-health', backendStatusValue, backendStatusValue);
         const backendDetails = document.getElementById('backend-health-details');
         if (backendDetails) {
-            backendDetails.textContent = backendHealth.httpApi?.status === 'healthy'
-                ? 'Desktop bridge connected'
+            backendDetails.textContent = this.hasDesktopBridge
+                ? 'Desktop IPC active'
                 : (backendHealth.httpApi?.lastError || 'Waiting for health data');
         }
 
-        setValue('http-api-health', backendHealth.httpApi?.status || 'unknown', backendHealth.httpApi?.status || 'unknown');
+        setValue('http-api-health', httpApiStatusValue, httpApiStatusValue);
         const httpPort = document.getElementById('http-api-port');
         if (httpPort) {
             httpPort.textContent = backendHealth.httpApi?.port || '3030';
         }
 
-        setValue('websocket-health', backendHealth.webSocket?.status || 'unknown', backendHealth.webSocket?.status || 'unknown');
+        setValue('websocket-health', webSocketStatusValue, webSocketStatusValue);
         const wsClients = document.getElementById('ws-health-clients');
         if (wsClients) {
             wsClients.textContent = backendHealth.webSocket?.clients ?? 0;
