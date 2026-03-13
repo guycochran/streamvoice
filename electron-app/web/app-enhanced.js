@@ -555,8 +555,12 @@ class StreamVoiceEnhanced {
                     this.result.style.color = '#2ecc71';
                 }
             } else if (state.status === 'error') {
-                if (this.heardCommand && state.transcript) {
-                    this.heardCommand.textContent = `Heard: "${state.transcript}"`;
+                if (this.heardCommand) {
+                    this.heardCommand.textContent = state.transcript
+                        ? `Heard: "${state.transcript}"`
+                        : (state.partialTranscript
+                            ? `Heard: "${state.partialTranscript}"`
+                            : 'Heard: no recognizable command yet');
                     this.heardCommand.style.color = '#8ab4ff';
                 }
                 this.result.textContent = `Speech error: ${state.lastError}`;

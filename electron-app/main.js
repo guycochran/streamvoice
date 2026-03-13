@@ -258,7 +258,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.22',
+          message: 'StreamVoice v1.1.0-alpha.23',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -757,15 +757,15 @@ async function executeDesktopCommand(command) {
     result = await desktopSetVolume('mic', micVolumeMatch[1]);
   } else if (desktopVolumeMatch) {
     result = await desktopSetVolume('desktop', desktopVolumeMatch[1]);
-  } else if (normalized === 'start recording') {
+  } else if (normalized === 'start recording' || normalized === 'record') {
     result = await desktopStartRecording();
-  } else if (normalized === 'start streaming') {
+  } else if (normalized === 'start streaming' || normalized === 'start stream' || normalized === 'go live') {
     result = await desktopStartStreaming();
-  } else if (normalized === 'mute mic' || normalized === 'mute my mic') {
+  } else if (normalized === 'mute mic' || normalized === 'mute my mic' || normalized === 'mute') {
     result = await desktopSetMute('mic', true);
-  } else if (normalized === 'unmute mic' || normalized === 'unmute my mic') {
+  } else if (normalized === 'unmute mic' || normalized === 'unmute my mic' || normalized === 'unmute') {
     result = await desktopSetMute('mic', false);
-  } else if (normalized === 'take screenshot') {
+  } else if (normalized === 'take screenshot' || normalized === 'screenshot') {
     result = await desktopTakeScreenshot();
   } else if (normalized === 'emergency mute') {
     await desktopSetMute('mic', true);
@@ -1236,7 +1236,7 @@ ipcMain.handle('speech-submit-audio', async (_event, payload) => {
     const normalizedTranscript = normalizeSpeechTranscript(transcript);
 
     if (!normalizedTranscript) {
-      throw new Error('Whisper returned an empty transcript');
+      throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
     }
 
     speechService.completeTranscript(normalizedTranscript);
