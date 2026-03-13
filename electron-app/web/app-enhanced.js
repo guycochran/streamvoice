@@ -12,6 +12,7 @@ class StreamVoiceEnhanced {
         this.speechState = null;
         this.currentMicLevel = 0;
         this.voiceInputMode = 'push_to_talk';
+        this.activeVoicePointerId = null;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -344,21 +345,66 @@ class StreamVoiceEnhanced {
     }
 
     setupEventListeners() {
-        this.voiceButton.addEventListener('mousedown', () => {
-            if (this.voiceInputMode === 'push_to_talk') {
-                this.startListening();
-            }
-        });
-        this.voiceButton.addEventListener('mouseup', () => {
-            if (this.voiceInputMode === 'push_to_talk') {
+        const stopPttIfActive = () => {
+            if (this.voiceInputMode === 'push_to_talk' && this.isListening) {
                 this.stopListening();
             }
-        });
-        this.voiceButton.addEventListener('mouseleave', () => {
-            if (this.voiceInputMode === 'push_to_talk') {
-                this.stopListening();
+        };
+
+        this.voiceButton.addEventListener('pointerdown', (event) => {
+            if (this.voiceInputMode !== 'push_to_talk') {
+                return;
             }
+
+            if (event.pointerType === 'mouse' && event.button !== 0) {
+                return;
+            }
+
+            this.activeVoicePointerId = event.pointerId;
+
+            try {
+                this.voiceButton.setPointerCapture(event.pointerId);
+            } catch (_error) {
+                // Pointer capture is best-effort.
+            }
+
+            event.preventDefault();
+            this.startListening();
         });
+
+        this.voiceButton.addEventListener('pointerup', (event) => {
+            if (this.voiceInputMode !== 'push_to_talk') {
+                return;
+            }
+
+            if (this.activeVoicePointerId !== null && event.pointerId !== this.activeVoicePointerId) {
+                return;
+            }
+
+            this.activeVoicePointerId = null;
+            stopPttIfActive();
+        });
+
+        this.voiceButton.addEventListener('pointercancel', () => {
+            this.activeVoicePointerId = null;
+            stopPttIfActive();
+        });
+
+        this.voiceButton.addEventListener('lostpointercapture', () => {
+            this.activeVoicePointerId = null;
+            stopPttIfActive();
+        });
+
+        window.addEventListener('pointerup', () => {
+            this.activeVoicePointerId = null;
+            stopPttIfActive();
+        });
+
+        window.addEventListener('blur', () => {
+            this.activeVoicePointerId = null;
+            stopPttIfActive();
+        });
+
         this.voiceButton.addEventListener('click', (event) => {
             if (this.voiceInputMode !== 'latched') {
                 return;
@@ -486,6 +532,8 @@ class StreamVoiceEnhanced {
     }
 
     stopListening() {
+        this.activeVoicePointerId = null;
+
         if (this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStopPushToTalk) {
             this.isListening = false;
             this.voiceButton.classList.remove('listening');
