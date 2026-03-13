@@ -10,6 +10,7 @@ class StreamVoiceEnhanced {
         this.apiBaseUrl = this.detectApiBaseUrl();
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
+        this.currentMicLevel = 0;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -409,6 +410,7 @@ class StreamVoiceEnhanced {
 
         window.electronAPI.onSpeechStateUpdated((state) => {
             this.speechState = state;
+            this.updateMicLevelDisplay(state.inputLevel || 0, state.selectedMicLabel || 'System Default Microphone');
             if (state.status === 'recording') {
                 this.transcript.textContent = 'Listening...';
                 this.transcript.style.color = '#95a5a6';
@@ -434,6 +436,27 @@ class StreamVoiceEnhanced {
                 this.result.style.color = '#e74c3c';
             }
         });
+    }
+
+    updateMicLevelDisplay(level = 0, label = 'System Default Microphone') {
+        const bar = document.getElementById('mic-level-bar');
+        const levelLabel = document.getElementById('mic-level-label');
+        const activeMicLabel = document.getElementById('active-mic-label');
+        const safeLevel = Math.max(0, Math.min(1, Number(level || 0)));
+
+        if (bar) {
+            bar.style.width = `${Math.round(safeLevel * 100)}%`;
+        }
+
+        if (levelLabel) {
+            levelLabel.textContent = safeLevel > 0.02
+                ? `${Math.round(safeLevel * 100)}% signal`
+                : 'No signal';
+        }
+
+        if (activeMicLabel) {
+            activeMicLabel.textContent = `Active Mic: ${label || 'System Default Microphone'}`;
+        }
     }
 
     updateConnectionStatus() {
@@ -518,6 +541,8 @@ class StreamVoiceEnhanced {
                 `OBS URL: ${this.debugStatus?.obsWebSocketUrl || 'unknown'}`,
                 `Speech Provider: ${this.speechState?.provider || 'unknown'}`,
                 `Speech Model: ${this.speechState?.model || 'unknown'} (${this.speechState?.modelStatus || 'unknown'})`,
+                `Selected Mic: ${this.speechState?.selectedMicLabel || 'System Default Microphone'}`,
+                `Mic Input Level: ${Math.round((this.speechState?.inputLevel || 0) * 100)}%`,
                 `Server PID: ${this.debugStatus?.pid || 'unknown'}`,
                 `Uptime: ${this.debugStatus?.uptimeSeconds ?? 'unknown'}s`,
                 `Last OBS error: ${this.debugStatus?.lastObsError || 'none'}`,
@@ -559,6 +584,11 @@ class StreamVoiceEnhanced {
             micStatus.textContent = health.microphone.status.toUpperCase();
             micStatus.style.color = getStatusColor(health.microphone.status);
         }
+
+        this.updateMicLevelDisplay(
+            health.microphone?.inputLevel ?? this.speechState?.inputLevel ?? 0,
+            health.microphone?.selectedMicLabel || this.speechState?.selectedMicLabel || 'System Default Microphone'
+        );
 
         // Update speech engine status if element exists
         const speechStatus = document.getElementById('speech-status');
@@ -1025,6 +1055,8 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Supported: ${speech.supported !== null ? (speech.supported ? 'Yes' : 'No') : 'unknown'}
   Model: ${this.speechState?.model || speech.model || 'unknown'}
   Model Status: ${this.speechState?.modelStatus || speech.modelStatus || 'unknown'}
+  Selected Mic: ${this.speechState?.selectedMicLabel || speech.selectedMicLabel || 'System Default Microphone'}
+  Input Level: ${Math.round((this.speechState?.inputLevel || speech.inputLevel || 0) * 100)}%
   Last Transcript: ${this.speechState?.transcript || 'none'}
   Last Error: ${this.speechState?.lastError || speech.lastError || 'none'}
 `;
@@ -1033,6 +1065,8 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
         const mic = micHealth;
         report += `\nMicrophone:
   Status: ${mic.status || 'unknown'}
+  Selected Device: ${mic.selectedMicLabel || this.speechState?.selectedMicLabel || 'System Default Microphone'}
+  Input Level: ${Math.round((mic.inputLevel ?? this.speechState?.inputLevel ?? 0) * 100)}%
   Last Error: ${mic.lastError || 'none'}
 `;
 

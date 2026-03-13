@@ -22,7 +22,10 @@ class SpeechService extends EventEmitter {
       lastCommandMessage: null,
       lastError: null,
       lastAudioPath: null,
-      lastAudioDurationMs: 0
+      lastAudioDurationMs: 0,
+      inputLevel: 0,
+      selectedMicDeviceId: '',
+      selectedMicLabel: ''
     };
   }
 
@@ -112,6 +115,15 @@ class SpeechService extends EventEmitter {
       lastAudioPath: details.filePath || null,
       lastAudioDurationMs: details.durationMs || 0,
       lastError: null
+    });
+  }
+
+  updateCaptureTelemetry(details = {}) {
+    return this.setState({
+      inputLevel: typeof details.inputLevel === 'number' ? details.inputLevel : this.state.inputLevel,
+      selectedMicDeviceId: details.selectedMicDeviceId ?? this.state.selectedMicDeviceId,
+      selectedMicLabel: details.selectedMicLabel ?? this.state.selectedMicLabel,
+      lastError: details.lastError ?? this.state.lastError
     });
   }
 }

@@ -257,7 +257,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.16',
+          message: 'StreamVoice v1.1.0-alpha.17',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -367,7 +367,9 @@ function ensureSpeechCaptureDir() {
 async function persistSpeechCapture(audioBytes, metadata = {}) {
   const captureDir = ensureSpeechCaptureDir();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const extension = metadata.mimeType === 'audio/webm' ? 'webm' : 'bin';
+  const extension = metadata.mimeType === 'audio/wav'
+    ? 'wav'
+    : (metadata.mimeType === 'audio/webm' ? 'webm' : 'bin');
   const filePath = path.join(captureDir, `utterance-${timestamp}.${extension}`);
   await fs.promises.writeFile(filePath, Buffer.from(audioBytes));
   return filePath;
@@ -495,6 +497,8 @@ function getDesktopHealthStatus() {
         supported: speechState.available,
         model: speechState.model,
         modelStatus: speechState.modelStatus,
+        inputLevel: speechState.inputLevel,
+        selectedMicLabel: speechState.selectedMicLabel,
         lastError: speechState.lastError,
         lastTranscriptAt: speechState.lastTranscriptAt
       },
@@ -516,6 +520,16 @@ function broadcastSpeechState() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('speech-state-updated', speechService.getState());
   }
+}
+
+function syncSpeechCaptureMonitor() {
+  if (!speechCaptureWindow || speechCaptureWindow.isDestroyed()) {
+    return;
+  }
+
+  speechCaptureWindow.webContents.send('speech-capture-monitor-start', {
+    deviceId: appSettings.preferredMicDeviceId || ''
+  });
 }
 
 function updateSpeechRuntimeConfig() {
@@ -1028,7 +1042,9 @@ ipcMain.handle('desktop-get-health', () => {
     ...health.subsystems.speech,
     status: speechState.status === 'error' ? 'error' : (speechState.available ? 'available' : health.subsystems.speech.status),
     engine: speechState.provider,
-    supported: speechState.available
+    supported: speechState.available,
+    inputLevel: speechState.inputLevel,
+    selectedMicLabel: speechState.selectedMicLabel
   };
   if (desktopObsState.microphone) {
     health.subsystems.microphone = {
@@ -1134,6 +1150,30 @@ ipcMain.on('speech-capture-error', (_event, message) => {
 
 ipcMain.on('speech-capture-ready', () => {
   updateSpeechRuntimeConfig();
+  syncSpeechCaptureMonitor();
+  broadcastSpeechState();
+});
+
+ipcMain.on('speech-capture-level', (_event, payload = {}) => {
+  const nextInputLevel = Number(payload.inputLevel || 0);
+  const nextMicLabel = payload.selectedMicLabel || appSettings.preferredMicLabel || 'System Default Microphone';
+  const nextMicDeviceId = payload.selectedMicDeviceId ?? appSettings.preferredMicDeviceId;
+
+  speechService.updateCaptureTelemetry({
+    inputLevel: nextInputLevel,
+    selectedMicDeviceId: nextMicDeviceId,
+    selectedMicLabel: nextMicLabel
+  });
+
+  desktopObsState.microphone = {
+    ...(desktopObsState.microphone || {}),
+    status: 'available',
+    inputLevel: nextInputLevel,
+    selectedMicDeviceId: nextMicDeviceId,
+    selectedMicLabel: nextMicLabel,
+    lastError: null
+  };
+
   broadcastSpeechState();
 });
 
@@ -1215,6 +1255,9 @@ ipcMain.handle('save-settings', (event, settings) => {
   }
 
   persistAppSettings();
+  if (Object.prototype.hasOwnProperty.call(settings, 'preferredMicDeviceId')) {
+    syncSpeechCaptureMonitor();
+  }
 
   return appSettings;
 });

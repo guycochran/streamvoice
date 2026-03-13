@@ -11,6 +11,171 @@
       let mediaRecorder = null;
       let recordedChunks = [];
       let recordingStartedAt = null;
+      let audioContext = null;
+      let analyserNode = null;
+      let sourceNode = null;
+      let levelTimer = null;
+      let activeDeviceId = '';
+      let activeDeviceLabel = 'System Default Microphone';
+
+      function getConstraints(deviceId = '') {
+        if (deviceId) {
+          return {
+            audio: {
+              deviceId: { exact: deviceId },
+              channelCount: 1,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            }
+          };
+        }
+
+        return {
+          audio: {
+            channelCount: 1,
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
+        };
+      }
+
+      function writeAscii(view, offset, value) {
+        for (let i = 0; i < value.length; i += 1) {
+          view.setUint8(offset + i, value.charCodeAt(i));
+        }
+      }
+
+      function mixToMono(audioBuffer) {
+        const mixed = new Float32Array(audioBuffer.length);
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel += 1) {
+          const input = audioBuffer.getChannelData(channel);
+          for (let i = 0; i < audioBuffer.length; i += 1) {
+            mixed[i] += input[i] / audioBuffer.numberOfChannels;
+          }
+        }
+        return mixed;
+      }
+
+      function resampleChannel(channelData, sourceRate, targetRate) {
+        if (sourceRate === targetRate) {
+          return channelData;
+        }
+
+        const ratio = sourceRate / targetRate;
+        const outputLength = Math.max(1, Math.round(channelData.length / ratio));
+        const output = new Float32Array(outputLength);
+
+        for (let i = 0; i < outputLength; i += 1) {
+          const position = i * ratio;
+          const left = Math.floor(position);
+          const right = Math.min(left + 1, channelData.length - 1);
+          const weight = position - left;
+          output[i] = (channelData[left] * (1 - weight)) + (channelData[right] * weight);
+        }
+
+        return output;
+      }
+
+      function encodeWav(audioBuffer) {
+        const targetRate = 16000;
+        const channelData = audioBuffer.numberOfChannels > 1
+          ? mixToMono(audioBuffer)
+          : audioBuffer.getChannelData(0);
+        const samples = resampleChannel(channelData, audioBuffer.sampleRate, targetRate);
+        const wavBuffer = new ArrayBuffer(44 + (samples.length * 2));
+        const view = new DataView(wavBuffer);
+
+        writeAscii(view, 0, 'RIFF');
+        view.setUint32(4, 36 + (samples.length * 2), true);
+        writeAscii(view, 8, 'WAVE');
+        writeAscii(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, targetRate, true);
+        view.setUint32(28, targetRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeAscii(view, 36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+
+        let offset = 44;
+        for (let i = 0; i < samples.length; i += 1) {
+          const sample = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+          offset += 2;
+        }
+
+        return new Uint8Array(wavBuffer);
+      }
+
+      function reportLevel(level) {
+        window.speechCaptureAPI.reportLevel({
+          inputLevel: Math.max(0, Math.min(1, level || 0)),
+          selectedMicDeviceId: activeDeviceId,
+          selectedMicLabel: activeDeviceLabel
+        });
+      }
+
+      async function startLevelReporting(stream) {
+        if (levelTimer) {
+          clearInterval(levelTimer);
+          levelTimer = null;
+        }
+        sourceNode?.disconnect?.();
+        analyserNode?.disconnect?.();
+        if (audioContext && audioContext.state !== 'closed') {
+          await audioContext.close().catch(() => {});
+        }
+
+        audioContext = new AudioContext();
+        sourceNode = audioContext.createMediaStreamSource(stream);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 1024;
+        sourceNode.connect(analyserNode);
+
+        const data = new Uint8Array(analyserNode.fftSize);
+        levelTimer = setInterval(() => {
+          if (!analyserNode) {
+            return;
+          }
+          analyserNode.getByteTimeDomainData(data);
+          let sumSquares = 0;
+          for (let i = 0; i < data.length; i += 1) {
+            const sample = (data[i] - 128) / 128;
+            sumSquares += sample * sample;
+          }
+          const rms = Math.sqrt(sumSquares / data.length);
+          reportLevel(rms * 4);
+        }, 120);
+      }
+
+      async function ensureStream(deviceId = '') {
+        const currentTrack = mediaStream?.getAudioTracks?.()[0];
+        const currentDeviceId = currentTrack?.getSettings?.().deviceId || '';
+
+        if (mediaStream && ((!deviceId && !currentDeviceId) || currentDeviceId === deviceId)) {
+          return mediaStream;
+        }
+
+        if (mediaStream && !mediaRecorder) {
+          mediaStream.getTracks().forEach((track) => track.stop());
+          mediaStream = null;
+        }
+
+        if (!mediaStream) {
+          mediaStream = await navigator.mediaDevices.getUserMedia(getConstraints(deviceId));
+          const track = mediaStream.getAudioTracks()[0];
+          activeDeviceId = track?.getSettings?.().deviceId || deviceId || '';
+          activeDeviceLabel = track?.label || 'System Default Microphone';
+          await startLevelReporting(mediaStream);
+          reportLevel(0);
+        }
+
+        return mediaStream;
+      }
 
       async function startCapture(config = {}) {
         if (mediaRecorder) {
@@ -18,10 +183,7 @@
         }
 
         try {
-          const constraints = config.deviceId
-            ? { audio: { deviceId: { exact: config.deviceId } } }
-            : { audio: true };
-          mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+          await ensureStream(config.deviceId || '');
           recordedChunks = [];
           recordingStartedAt = Date.now();
 
@@ -50,10 +212,8 @@
         }
 
         const recorder = mediaRecorder;
-        const stream = mediaStream;
         const startedAt = recordingStartedAt || Date.now();
         mediaRecorder = null;
-        mediaStream = null;
         recordingStartedAt = null;
 
         await new Promise((resolve) => {
@@ -61,18 +221,28 @@
           recorder.stop();
         });
 
-        stream?.getTracks().forEach((track) => track.stop());
-
         try {
           const blob = new Blob(recordedChunks, { type: recorder.mimeType || 'audio/webm' });
           recordedChunks = [];
-          const audioBytes = new Uint8Array(await blob.arrayBuffer());
+          const blobBuffer = await blob.arrayBuffer();
+          const decodeContext = new AudioContext();
+          const audioBuffer = await decodeContext.decodeAudioData(blobBuffer.slice(0));
+          const audioBytes = encodeWav(audioBuffer);
+          await decodeContext.close();
 
           await window.speechCaptureAPI.submitAudio({
             audioBytes,
-            mimeType: blob.type || 'audio/webm',
+            mimeType: 'audio/wav',
             durationMs: Date.now() - startedAt
           });
+        } catch (error) {
+          window.speechCaptureAPI.reportError(error.message);
+        }
+      }
+
+      async function startMonitor(config = {}) {
+        try {
+          await ensureStream(config.deviceId || '');
         } catch (error) {
           window.speechCaptureAPI.reportError(error.message);
         }
@@ -84,6 +254,10 @@
 
       window.speechCaptureAPI.onStop(() => {
         stopCapture();
+      });
+
+      window.speechCaptureAPI.onStartMonitor((config) => {
+        startMonitor(config);
       });
 
       window.speechCaptureAPI.reportReady();

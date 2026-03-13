@@ -224,6 +224,17 @@
                     <p id="result" class="result"></p>
                 </div>
 
+                <div style="margin: 18px auto 0; max-width: 420px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: #b9c0d0; margin-bottom: 6px;">
+                        <span>Mic Input Level</span>
+                        <span id="mic-level-label">No signal</span>
+                    </div>
+                    <div style="height: 12px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden;">
+                        <div id="mic-level-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #2ecc71, #f1c40f 60%, #e74c3c); transition: width 0.12s ease;"></div>
+                    </div>
+                    <div id="active-mic-label" style="margin-top: 8px; font-size: 12px; color: #95a5a6; text-align: center;">Active Mic: System Default Microphone</div>
+                </div>
+
                 <div class="command-history">
                     <h3>Recent Commands</h3>
                     <ul id="history-list" class="history-list">
@@ -429,7 +440,7 @@
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <div style="margin-bottom: 15px;">
                             <label for="mic-device" style="display: block; margin-bottom: 5px; color: #9b59b6;">Input Device:</label>
-                            <select id="mic-device" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                            <select id="mic-device" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;">
                                 <option value="">System Default Microphone</option>
                             </select>
                         </div>
@@ -664,6 +675,11 @@
             }
 
             try {
+                if (navigator.mediaDevices?.getUserMedia) {
+                    const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    permissionStream.getTracks().forEach(track => track.stop());
+                }
+
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const audioInputs = devices.filter(device => device.kind === 'audioinput');
                 const currentValue = preferredDeviceId !== null ? preferredDeviceId : select.value;
@@ -672,12 +688,16 @@
                 const defaultOption = document.createElement('option');
                 defaultOption.value = '';
                 defaultOption.textContent = 'System Default Microphone';
+                defaultOption.style.color = '#111827';
+                defaultOption.style.backgroundColor = '#ffffff';
                 select.appendChild(defaultOption);
 
                 audioInputs.forEach((device, index) => {
                     const option = document.createElement('option');
                     option.value = device.deviceId;
                     option.textContent = device.label || `Microphone ${index + 1}`;
+                    option.style.color = '#111827';
+                    option.style.backgroundColor = '#ffffff';
                     select.appendChild(option);
                 });
 
