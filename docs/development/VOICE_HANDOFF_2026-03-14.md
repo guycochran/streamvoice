@@ -2,124 +2,87 @@
 
 ## Current State
 
-Voice is still not working in packaged Windows builds.
+Voice now works in packaged Windows builds.
 
-What does work:
-- OBS desktop IPC path works
-- OBS scene inventory populates
-- mic selection works
-- VU metering works
-- Whisper binary/model bundle is present and detected
-- the app can show real speech diagnostics
+Confirmed working path:
+- native Windows recorder sidecar using `NAudio`
+- Electron main owns the recording lifecycle
+- recorded WAV is passed to `whisper.cpp`
+- transcript is routed into the desktop OBS command executor
 
-What does not work:
-- press-to-talk does not complete end-to-end reliably
-- transcripts do not appear
-- commands are not being executed from speech
+Confirmed working behavior from packaged Windows testing:
+- transcript appears in the UI
+- `mute microphone` works
+- `switch scene to gameplay` works
+- `start stream` works
+- `stop stream` works
 
-## Latest Important Commits
+Latest successful tested line:
+- app version `1.1.0-alpha.37`
+- next promoted candidate in repo: `1.1.0-beta.1`
 
-- `ba165b4` `Fix audio IPC serialization in speech capture - v1.1.0-alpha.30`
-- `84b3056` `Replace voice capture path in renderer`
-- `117ac12` `Rollback unstable renderer voice capture`
+## What Changed
 
-`84b3056` was an attempted replacement of the hidden capture-window path with direct renderer capture. It caused the UI to go black on mic release and was rolled back by `117ac12`.
+Recent important commits:
+- `8401e36` `Replace ffmpeg plan with NAudio recorder sidecar`
+- `c43ff58` `Add stop stream and microphone voice aliases`
 
-Current safe recovery point is:
-- `117ac12`
-- app version `1.1.0-alpha.32`
+The major breakthrough was replacing the unstable browser capture path with a Windows native recorder sidecar.
 
-## What We Learned
+## What Diagnostics Prove Now
 
-### Confirmed Good
+In working packaged builds, diagnostics now show real values for:
+- `Last Audio Path`
+- `Last Audio Size`
+- `Last Audio Type: audio/wav`
+- `Last Whisper Duration`
+- `Last Transcript`
 
-- OBS connection is not the blocker
-- Whisper installation/runtime detection is not the blocker
-- microphone selection and input monitoring are not the blocker
+That means the critical voice pipeline is now real end-to-end:
+- capture
+- WAV file creation
+- Whisper transcription
+- command execution
 
-### Confirmed Bad
+## Current Supported Voice Commands
 
-- browser/renderer capture experiments are not stable enough
-- the hidden BrowserWindow capture path is fragile
-- the direct visible-renderer capture replacement was worse and regressed the UI
+These are the safest commands to treat as working now:
+- `mute mic`
+- `mute microphone`
+- `unmute mic`
+- `unmute microphone`
+- `start stream`
+- `stop stream`
+- `start recording`
+- `stop recording`
+- `take screenshot`
+- `switch to <scene>`
+- `switch scene to <scene>`
+- `stream starting setup`
+- `stream ending setup`
+- `raid mode`
 
-### Strongest Diagnostic Evidence
+## What Should Happen Next
 
-Before the rollback, diagnostics consistently showed:
-- live VU movement
-- selected mic label populated correctly
-- `Last Audio Size` non-zero
-- `Capture Chunks` non-zero
+Do not destabilize the working native voice path.
 
-But also:
-- `Last Audio Path: none`
-- `Last Whisper Duration: unknown`
-- `Last Transcript: none`
+Next priorities:
+1. remove obsolete browser-capture code from the active production path
+2. tighten the supported voice command set and aliases
+3. improve diagnostics wording and user-facing setup
+4. add configurable push-to-talk hotkey
+5. add optional wake-word arming mode after hotkey support
 
-That means the failure is in the capture finalization / submission path before successful Whisper transcription completes.
+## Wake Word Requirement
 
-## Do Not Waste More Time On
+Planned follow-on:
+- default optional wake phrase: `Blue 42`
+- should arm a short command window
+- should remain optional
+- should come after stable hotkey support
 
-- patching Web Speech API
-- more hidden BrowserWindow `MediaRecorder` tweaks
-- more visible-renderer `MediaRecorder` tweaks
-- more IPC payload-shape experiments by themselves
-
-The codebase has already spent too many cycles there.
-
-## Recommended Next Step
-
-Replace the current capture mechanism with a native/main-process audio capture path.
-
-Target architecture:
-- Electron main owns speech state
-- Electron main owns audio capture
-- Electron main writes the captured WAV file directly
-- Electron main invokes Whisper directly on that file
-- renderer only shows:
-  - listening
-  - transcribing
-  - heard transcript
-  - command result
-
-Do not put the main app UI renderer in the critical recording path.
-
-## Follow-On Requirement
-
-After native push-to-talk works, add an optional wake-word mode.
-
-Initial target:
-- default wake phrase: `Blue 42`
-- configurable on/off
-- configurable phrase later
-- use wake word to arm a short command window, not permanently open listening
-
-Recommended order:
-1. native push-to-talk works
-2. configurable hotkey works
-3. optional wake-word arming mode
-
-This matters because the target environment can include loud gameplay and kids yelling over headsets. Wake word should be optional and constrained, not the primary first recovery milestone.
-
-## Files To Read First
-
-- [main.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/main.js)
-- [speech-service.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/services/speech-service.js)
-- [whisper-runner.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/services/whisper-runner.js)
-- [speech-capture.html](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/speech-capture.html)
-- [app-enhanced.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/web/app-enhanced.js)
-
-## Practical Success Definition
-
-The next LLM should consider the task complete only when all of these are true in a packaged Windows build:
-
-- pressing the mic button does not blank the UI
-- mic capture completes
-- `Last Audio Path` becomes a real file path
-- `Last Whisper Duration` gets a real value
-- a transcript appears under `Heard:`
-- a short command like `mute mic` executes in OBS
+The target environment includes noisy gameplay and kids yelling over headsets, so wake word must be constrained and configurable.
 
 ## Blunt Recommendation
 
-Treat native/main-process capture as the primary plan, not the fallback plan.
+Treat the native recorder + Whisper path as the production voice architecture unless a concrete failure is discovered.
