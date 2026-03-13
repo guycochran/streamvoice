@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('speechCaptureAPI', {
-  onStart: (callback) => ipcRenderer.on('speech-capture-start', callback),
+  onStart: (callback) => ipcRenderer.on('speech-capture-start', (_event, payload) => callback(payload)),
   onStop: (callback) => ipcRenderer.on('speech-capture-stop', callback),
   submitAudio: (payload) => ipcRenderer.invoke('speech-submit-audio', payload),
   reportError: (message) => ipcRenderer.send('speech-capture-error', message),

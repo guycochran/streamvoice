@@ -425,6 +425,29 @@
                 <p style="color: #666; margin-bottom: 20px;">Configure StreamVoice and OBS connection settings</p>
 
                 <div class="settings-section">
+                    <h4>Microphone Selection</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label for="mic-device" style="display: block; margin-bottom: 5px; color: #9b59b6;">Input Device:</label>
+                            <select id="mic-device" style="width: 100%; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #fff;">
+                                <option value="">System Default Microphone</option>
+                            </select>
+                        </div>
+                        <div id="mic-device-status" style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
+                            Choose the microphone StreamVoice should use for push-to-talk.
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="macro-button" onclick="refreshMicrophones()" style="background: #16a085; padding: 10px 20px;">
+                                🎤 Refresh Devices
+                            </button>
+                            <button class="macro-button" onclick="saveAppPreferences()" style="background: #8e44ad; padding: 10px 20px;">
+                                💾 Save Mic Choice
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h4>OBS WebSocket Connection</h4>
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <div style="margin-bottom: 15px;">
@@ -631,6 +654,68 @@
             }
         }
 
+        async function refreshMicrophones(preferredDeviceId = null) {
+            const select = document.getElementById('mic-device');
+            const status = document.getElementById('mic-device-status');
+
+            if (!navigator.mediaDevices?.enumerateDevices) {
+                status.textContent = 'Microphone enumeration is not available in this build.';
+                return;
+            }
+
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                const currentValue = preferredDeviceId !== null ? preferredDeviceId : select.value;
+
+                select.innerHTML = '';
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'System Default Microphone';
+                select.appendChild(defaultOption);
+
+                audioInputs.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Microphone ${index + 1}`;
+                    select.appendChild(option);
+                });
+
+                if ([...select.options].some(option => option.value === currentValue)) {
+                    select.value = currentValue;
+                }
+
+                status.textContent = audioInputs.length
+                    ? `Found ${audioInputs.length} microphone input(s).`
+                    : 'No microphone inputs were found.';
+            } catch (error) {
+                status.textContent = `Failed to enumerate microphones: ${error.message}`;
+            }
+        }
+
+        async function saveAppPreferences() {
+            const select = document.getElementById('mic-device');
+            const status = document.getElementById('mic-device-status');
+            const selectedOption = select.options[select.selectedIndex];
+
+            if (!window.electronAPI?.saveSettings) {
+                status.textContent = 'Settings persistence is unavailable in this build.';
+                return;
+            }
+
+            try {
+                await window.electronAPI.saveSettings({
+                    preferredMicDeviceId: select.value || '',
+                    preferredMicLabel: selectedOption?.textContent || ''
+                });
+                status.textContent = select.value
+                    ? `Saved microphone: ${selectedOption.textContent}`
+                    : 'Saved microphone preference: System Default Microphone';
+            } catch (error) {
+                status.textContent = `Failed to save microphone selection: ${error.message}`;
+            }
+        }
+
         async function testObsConnection() {
             const statusDiv = document.getElementById('settings-status');
             statusDiv.style.display = 'block';
@@ -671,6 +756,14 @@
         // Load settings on page load
         async function loadObsSettings() {
             try {
+                let preferredMicDeviceId = '';
+                if (window.electronAPI?.getSettings) {
+                    const settings = await window.electronAPI.getSettings();
+                    preferredMicDeviceId = settings.preferredMicDeviceId || '';
+                }
+
+                await refreshMicrophones(preferredMicDeviceId);
+
                 if (window.electronAPI?.desktopGetObsSettings) {
                     const settings = await window.electronAPI.desktopGetObsSettings();
                     document.getElementById('obs-host').value = settings.host || '127.0.0.1';

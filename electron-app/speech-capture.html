@@ -12,13 +12,16 @@
       let recordedChunks = [];
       let recordingStartedAt = null;
 
-      async function startCapture() {
+      async function startCapture(config = {}) {
         if (mediaRecorder) {
           return;
         }
 
         try {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const constraints = config.deviceId
+            ? { audio: { deviceId: { exact: config.deviceId } } }
+            : { audio: true };
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
           recordedChunks = [];
           recordingStartedAt = Date.now();
 
@@ -75,8 +78,8 @@
         }
       }
 
-      window.speechCaptureAPI.onStart(() => {
-        startCapture();
+      window.speechCaptureAPI.onStart((config) => {
+        startCapture(config);
       });
 
       window.speechCaptureAPI.onStop(() => {

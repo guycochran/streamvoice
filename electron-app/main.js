@@ -13,6 +13,7 @@ let speechCaptureWindow;
 let tray;
 let serverProcess;
 let obsSettingsFilePath;
+let appSettingsFilePath;
 let backendLogFilePath;
 let speechCaptureDirPath;
 let desktopObsReconnectTimer = null;
@@ -256,7 +257,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.15',
+          message: 'StreamVoice v1.1.0-alpha.16',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -391,6 +392,30 @@ function loadDesktopObsSettings() {
   } catch (error) {
     desktopObsState.lastError = `Failed to load OBS settings: ${error.message}`;
   }
+}
+
+function loadAppSettings() {
+  if (!appSettingsFilePath || !fs.existsSync(appSettingsFilePath)) {
+    return;
+  }
+
+  try {
+    const savedSettings = JSON.parse(fs.readFileSync(appSettingsFilePath, 'utf8'));
+    appSettings = {
+      ...appSettings,
+      ...savedSettings
+    };
+  } catch (error) {
+    console.warn('Failed to load app settings:', error.message);
+  }
+}
+
+function persistAppSettings() {
+  if (!appSettingsFilePath) {
+    return;
+  }
+
+  fs.writeFileSync(appSettingsFilePath, JSON.stringify(appSettings, null, 2));
 }
 
 function persistDesktopObsSettings() {
@@ -929,10 +954,12 @@ autoUpdater.on('update-downloaded', () => {
 // App event handlers
 app.whenReady().then(() => {
   obsSettingsFilePath = path.join(app.getPath('userData'), 'obs-settings.json');
+  appSettingsFilePath = path.join(app.getPath('userData'), 'app-settings.json');
   backendLogFilePath = path.join(app.getPath('userData'), 'backend.log');
   speechCaptureDirPath = path.join(app.getPath('userData'), 'speech-captures');
   fs.writeFileSync(backendLogFilePath, '', { flag: 'a' });
   loadDesktopObsSettings();
+  loadAppSettings();
   speechService.initialize();
   updateSpeechRuntimeConfig();
   createWindow();
@@ -970,7 +997,9 @@ app.on('activate', () => {
 let appSettings = {
   startWithWindows: false,
   minimizeToTray: true,
-  autoConnect: true
+  autoConnect: true,
+  preferredMicDeviceId: '',
+  preferredMicLabel: ''
 };
 
 // IPC handlers for renderer
@@ -1084,7 +1113,9 @@ ipcMain.handle('speech-get-state', () => {
 
 ipcMain.handle('speech-start-push-to-talk', () => {
   const state = speechService.startPushToTalk();
-  speechCaptureWindow?.webContents.send('speech-capture-start');
+  speechCaptureWindow?.webContents.send('speech-capture-start', {
+    deviceId: appSettings.preferredMicDeviceId || ''
+  });
   broadcastSpeechState();
   return state;
 });
@@ -1182,6 +1213,8 @@ ipcMain.handle('save-settings', (event, settings) => {
       openAsHidden: settings.startWithWindows
     });
   }
+
+  persistAppSettings();
 
   return appSettings;
 });
