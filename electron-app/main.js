@@ -257,7 +257,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.20',
+          message: 'StreamVoice v1.1.0-alpha.21',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -440,7 +440,9 @@ function getDesktopObsStatus() {
     url: desktopObsState.url,
     reconnectAttempts: desktopObsState.reconnectAttempts,
     lastSuccessfulConnection: desktopObsState.lastSuccessfulConnection,
-    lastError: desktopObsState.lastError
+    lastError: desktopObsState.lastError,
+    scenes: desktopObsState.scenes || [],
+    currentScene: desktopObsState.currentScene || ''
   };
 }
 
@@ -589,6 +591,11 @@ function normalizeDesktopName(value) {
     .replace(/[^a-z0-9]/g, '');
 }
 
+function resolveMappedScene(targetScene) {
+  const mappingKey = normalizeDesktopName(targetScene);
+  return appSettings.sceneMappings?.[mappingKey] || targetScene;
+}
+
 function getSceneAliases(targetScene) {
   const key = normalizeDesktopName(targetScene);
   const aliasMap = {
@@ -616,7 +623,8 @@ async function desktopSwitchToScene(targetScene) {
   }
 
   const { scenes } = await getDesktopSceneState();
-  const aliases = getSceneAliases(targetScene).map(normalizeDesktopName);
+  const requestedTarget = resolveMappedScene(targetScene);
+  const aliases = getSceneAliases(requestedTarget).map(normalizeDesktopName);
   const sceneName = scenes.find((scene) => {
     const normalizedScene = normalizeDesktopName(scene);
     return aliases.some((alias) =>
@@ -627,10 +635,15 @@ async function desktopSwitchToScene(targetScene) {
   });
 
   if (!sceneName) {
-    throw new Error(`Scene "${targetScene}" not found`);
+    throw new Error(`Scene "${requestedTarget}" not found`);
   }
 
   await desktopObs.call('SetCurrentProgramScene', { sceneName });
+  desktopObsState.currentScene = sceneName;
+  if (!Array.isArray(desktopObsState.scenes) || desktopObsState.scenes.length === 0) {
+    desktopObsState.scenes = scenes;
+  }
+  broadcastDesktopStatus();
   return { success: true, message: `Switched to ${sceneName}` };
 }
 
@@ -813,6 +826,9 @@ async function connectDesktopObs() {
     desktopObsState.status = 'connected';
     desktopObsState.lastError = null;
     desktopObsState.lastSuccessfulConnection = new Date().toISOString();
+    const sceneState = await getDesktopSceneState().catch(() => ({ scenes: [], currentScene: '' }));
+    desktopObsState.scenes = sceneState.scenes || [];
+    desktopObsState.currentScene = sceneState.currentScene || '';
   } catch (error) {
     desktopObsState.connected = false;
     desktopObsState.status = 'error';
@@ -828,6 +844,8 @@ async function connectDesktopObs() {
 desktopObs.on('ConnectionClosed', () => {
   desktopObsState.connected = false;
   desktopObsState.status = 'disconnected';
+  desktopObsState.scenes = [];
+  desktopObsState.currentScene = '';
   broadcastDesktopStatus();
   clearTimeout(desktopObsReconnectTimer);
   desktopObsReconnectTimer = setTimeout(() => {
@@ -1015,7 +1033,14 @@ let appSettings = {
   autoConnect: true,
   speechInputMode: 'push_to_talk',
   preferredMicDeviceId: '',
-  preferredMicLabel: ''
+  preferredMicLabel: '',
+  sceneMappings: {
+    starting: '',
+    ending: '',
+    brb: '',
+    raid: '',
+    gameplay: ''
+  }
 };
 
 // IPC handlers for renderer
@@ -1027,7 +1052,17 @@ ipcMain.handle('get-settings', () => {
   return appSettings;
 });
 
-ipcMain.handle('desktop-get-status', () => {
+ipcMain.handle('desktop-get-status', async () => {
+  if (desktopObsState.connected) {
+    try {
+      const sceneState = await getDesktopSceneState();
+      desktopObsState.scenes = sceneState.scenes || [];
+      desktopObsState.currentScene = sceneState.currentScene || '';
+    } catch (_error) {
+      // Keep the last known scene state.
+    }
+  }
+
   return getDesktopObsStatus();
 });
 

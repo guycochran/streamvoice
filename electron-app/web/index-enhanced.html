@@ -467,6 +467,40 @@
                 </div>
 
                 <div class="settings-section">
+                    <h4>Scene Mapping</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <p style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
+                            Map built-in actions to your actual OBS scenes.
+                        </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                            <div>
+                                <label for="scene-mapping-starting" style="display:block; margin-bottom: 5px; color: #9b59b6;">Starting Scene</label>
+                                <select id="scene-mapping-starting" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
+                            </div>
+                            <div>
+                                <label for="scene-mapping-ending" style="display:block; margin-bottom: 5px; color: #9b59b6;">Ending Scene</label>
+                                <select id="scene-mapping-ending" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
+                            </div>
+                            <div>
+                                <label for="scene-mapping-brb" style="display:block; margin-bottom: 5px; color: #9b59b6;">BRB Scene</label>
+                                <select id="scene-mapping-brb" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
+                            </div>
+                            <div>
+                                <label for="scene-mapping-raid" style="display:block; margin-bottom: 5px; color: #9b59b6;">Raid Scene</label>
+                                <select id="scene-mapping-raid" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
+                            </div>
+                            <div>
+                                <label for="scene-mapping-gameplay" style="display:block; margin-bottom: 5px; color: #9b59b6;">Gameplay Scene</label>
+                                <select id="scene-mapping-gameplay" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
+                            </div>
+                        </div>
+                        <div id="scene-mapping-status" style="font-size: 13px; color: #b9c0d0; margin-top: 12px;">
+                            Scene list will populate from the active OBS connection.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h4>OBS WebSocket Connection</h4>
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <div style="margin-bottom: 15px;">
@@ -721,10 +755,57 @@
             }
         }
 
+        function refreshSceneMappingOptions(sceneMappings = {}) {
+            const sceneNames = window.streamVoice?.obsScenes || [];
+            const status = document.getElementById('scene-mapping-status');
+            const mappingKeys = ['starting', 'ending', 'brb', 'raid', 'gameplay'];
+
+            mappingKeys.forEach((key) => {
+                const select = document.getElementById(`scene-mapping-${key}`);
+                if (!select) {
+                    return;
+                }
+
+                const currentValue = sceneMappings[key] || select.value || '';
+                select.innerHTML = '';
+
+                const autoOption = document.createElement('option');
+                autoOption.value = '';
+                autoOption.textContent = 'Auto-detect / alias match';
+                autoOption.style.color = '#111827';
+                autoOption.style.backgroundColor = '#ffffff';
+                select.appendChild(autoOption);
+
+                sceneNames.forEach((sceneName) => {
+                    const option = document.createElement('option');
+                    option.value = sceneName;
+                    option.textContent = sceneName;
+                    option.style.color = '#111827';
+                    option.style.backgroundColor = '#ffffff';
+                    select.appendChild(option);
+                });
+
+                if ([...select.options].some(option => option.value === currentValue)) {
+                    select.value = currentValue;
+                }
+            });
+
+            status.textContent = sceneNames.length
+                ? `Loaded ${sceneNames.length} OBS scene(s).`
+                : 'Scene list not available yet. Connect to OBS and refresh the status tab.';
+        }
+
         async function saveAppPreferences() {
             const select = document.getElementById('mic-device');
             const status = document.getElementById('mic-device-status');
             const selectedOption = select.options[select.selectedIndex];
+            const sceneMappings = {
+                starting: document.getElementById('scene-mapping-starting')?.value || '',
+                ending: document.getElementById('scene-mapping-ending')?.value || '',
+                brb: document.getElementById('scene-mapping-brb')?.value || '',
+                raid: document.getElementById('scene-mapping-raid')?.value || '',
+                gameplay: document.getElementById('scene-mapping-gameplay')?.value || ''
+            };
 
             if (!window.electronAPI?.saveSettings) {
                 status.textContent = 'Settings persistence is unavailable in this build.';
@@ -734,11 +815,13 @@
             try {
                 await window.electronAPI.saveSettings({
                     preferredMicDeviceId: select.value || '',
-                    preferredMicLabel: selectedOption?.textContent || ''
+                    preferredMicLabel: selectedOption?.textContent || '',
+                    sceneMappings
                 });
                 status.textContent = select.value
                     ? `Saved microphone: ${selectedOption.textContent}`
                     : 'Saved microphone preference: System Default Microphone';
+                document.getElementById('scene-mapping-status').textContent = 'Saved scene mapping preferences.';
             } catch (error) {
                 status.textContent = `Failed to save microphone selection: ${error.message}`;
             }
@@ -785,12 +868,15 @@
         async function loadObsSettings() {
             try {
                 let preferredMicDeviceId = '';
+                let savedSceneMappings = {};
                 if (window.electronAPI?.getSettings) {
                     const settings = await window.electronAPI.getSettings();
                     preferredMicDeviceId = settings.preferredMicDeviceId || '';
+                    savedSceneMappings = settings.sceneMappings || {};
                 }
 
                 await refreshMicrophones(preferredMicDeviceId);
+                refreshSceneMappingOptions(savedSceneMappings);
 
                 if (window.electronAPI?.desktopGetObsSettings) {
                     const settings = await window.electronAPI.desktopGetObsSettings();
@@ -817,6 +903,9 @@
         // Load settings when page loads
         window.addEventListener('DOMContentLoaded', () => {
             loadObsSettings();
+            setInterval(() => {
+                refreshSceneMappingOptions(window.electronAPI?.getSettings ? undefined : {});
+            }, 4000);
         });
     </script>
 </body>
