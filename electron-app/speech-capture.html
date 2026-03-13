@@ -369,6 +369,10 @@
         startMonitor(config);
       });
 
+      window.__streamvoiceStartCapture = startCapture;
+      window.__streamvoiceStopCapture = stopCapture;
+      window.__streamvoiceStartMonitor = startMonitor;
+
       window.speechCaptureAPI.reportReady();
     })();
   </script>
