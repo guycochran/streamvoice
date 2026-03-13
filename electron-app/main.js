@@ -258,7 +258,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.25',
+          message: 'StreamVoice v1.1.0-alpha.26',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1272,17 +1272,20 @@ ipcMain.handle('speech-submit-audio', async (_event, payload) => {
     });
     speechService.completeCapture({
       filePath,
-      durationMs: payload.durationMs
+      durationMs: payload.durationMs,
+      audioBytes: payload.audioBytes?.length || 0,
+      mimeType: payload.mimeType
     });
     updateSpeechRuntimeConfig();
     broadcastSpeechState();
 
-    const { transcript } = await transcribeWithWhisper({
+    const whisperResult = await transcribeWithWhisper({
       audioPath: filePath,
       appRoot: __dirname,
       userDataPath: app.getPath('userData')
     });
-    const normalizedTranscript = normalizeSpeechTranscript(transcript);
+    speechService.recordWhisperDiagnostics(whisperResult);
+    const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
 
     if (!normalizedTranscript) {
       throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
@@ -1327,13 +1330,13 @@ ipcMain.handle('speech-preview-audio', async (_event, payload) => {
     const filePath = await persistSpeechCapture(payload.audioBytes, {
       mimeType: payload.mimeType
     });
-    const { transcript } = await transcribeWithWhisper({
+    const whisperResult = await transcribeWithWhisper({
       audioPath: filePath,
       appRoot: __dirname,
       userDataPath: app.getPath('userData'),
       timeoutMs: 7000
     });
-    const normalizedTranscript = normalizeSpeechTranscript(transcript);
+    const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
 
     if (sequence !== latestSpeechPreviewSequence) {
       return {
@@ -1343,7 +1346,13 @@ ipcMain.handle('speech-preview-audio', async (_event, payload) => {
     }
 
     if (normalizedTranscript) {
-      speechService.updatePartialTranscript(normalizedTranscript);
+      speechService.recordPreview({
+        transcript: normalizedTranscript,
+        sequence,
+        durationMs: whisperResult.durationMs,
+        stdout: whisperResult.stdout,
+        stderr: whisperResult.stderr
+      });
       broadcastSpeechState();
     }
 

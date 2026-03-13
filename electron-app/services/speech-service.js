@@ -17,6 +17,9 @@ class SpeechService extends EventEmitter {
       binaryPath: null,
       transcript: '',
       partialTranscript: '',
+      lastPreviewTranscript: '',
+      lastPreviewAt: null,
+      lastPreviewSequence: 0,
       lastTranscriptAt: null,
       lastCommand: null,
       lastCommandStatus: null,
@@ -24,6 +27,11 @@ class SpeechService extends EventEmitter {
       lastError: null,
       lastAudioPath: null,
       lastAudioDurationMs: 0,
+      lastAudioBytes: 0,
+      lastAudioMimeType: null,
+      lastWhisperDurationMs: null,
+      lastWhisperStdout: '',
+      lastWhisperStderr: '',
       inputLevel: 0,
       selectedMicDeviceId: '',
       selectedMicLabel: ''
@@ -123,6 +131,8 @@ class SpeechService extends EventEmitter {
       status: 'transcribing',
       lastAudioPath: details.filePath || null,
       lastAudioDurationMs: details.durationMs || 0,
+      lastAudioBytes: details.audioBytes || this.state.lastAudioBytes,
+      lastAudioMimeType: details.mimeType || this.state.lastAudioMimeType,
       lastError: null
     });
   }
@@ -130,6 +140,26 @@ class SpeechService extends EventEmitter {
   updatePartialTranscript(transcript = '') {
     return this.setState({
       partialTranscript: transcript || this.state.partialTranscript
+    });
+  }
+
+  recordPreview(details = {}) {
+    return this.setState({
+      partialTranscript: details.transcript || this.state.partialTranscript,
+      lastPreviewTranscript: details.transcript || this.state.lastPreviewTranscript,
+      lastPreviewAt: new Date().toISOString(),
+      lastPreviewSequence: details.sequence ?? this.state.lastPreviewSequence,
+      lastWhisperDurationMs: details.durationMs ?? this.state.lastWhisperDurationMs,
+      lastWhisperStdout: details.stdout || this.state.lastWhisperStdout,
+      lastWhisperStderr: details.stderr || this.state.lastWhisperStderr
+    });
+  }
+
+  recordWhisperDiagnostics(details = {}) {
+    return this.setState({
+      lastWhisperDurationMs: details.durationMs ?? this.state.lastWhisperDurationMs,
+      lastWhisperStdout: details.stdout || this.state.lastWhisperStdout,
+      lastWhisperStderr: details.stderr || this.state.lastWhisperStderr
     });
   }
 

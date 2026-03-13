@@ -175,6 +175,8 @@ class StreamVoiceEnhanced {
                 websocketClients: 0
             };
             this.obsConnected = Boolean(status.connected);
+            this.obsScenes = status.scenes || [];
+            this.currentScene = status.currentScene || '';
             this.updateConnectionStatus();
             this.updateOBSStatus();
             this.renderDiagnostics();
@@ -675,6 +677,13 @@ class StreamVoiceEnhanced {
                 `Speech Model: ${this.speechState?.model || 'unknown'} (${this.speechState?.modelStatus || 'unknown'})`,
                 `Selected Mic: ${this.speechState?.selectedMicLabel || 'System Default Microphone'}`,
                 `Mic Input Level: ${Math.round((this.speechState?.inputLevel || 0) * 100)}%`,
+                `Last Audio Path: ${this.speechState?.lastAudioPath || 'none'}`,
+                `Last Audio Size: ${this.speechState?.lastAudioBytes || 0} bytes`,
+                `Last Audio Type: ${this.speechState?.lastAudioMimeType || 'unknown'}`,
+                `Last Preview Transcript: ${this.speechState?.lastPreviewTranscript || 'none'}`,
+                `Last Preview Sequence: ${this.speechState?.lastPreviewSequence || 0}`,
+                `Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'}ms`,
+                `Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 160)}`,
                 `Server PID: ${this.debugStatus?.pid || 'unknown'}`,
                 `Uptime: ${this.debugStatus?.uptimeSeconds ?? 'unknown'}s`,
                 `Last OBS error: ${this.debugStatus?.lastObsError || 'none'}`,
@@ -1276,6 +1285,12 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Model Status: ${this.speechState?.modelStatus || speech.modelStatus || 'unknown'}
   Selected Mic: ${this.speechState?.selectedMicLabel || speech.selectedMicLabel || 'System Default Microphone'}
   Input Level: ${Math.round((this.speechState?.inputLevel || speech.inputLevel || 0) * 100)}%
+  Last Preview Transcript: ${this.speechState?.lastPreviewTranscript || 'none'}
+  Last Audio Path: ${this.speechState?.lastAudioPath || 'none'}
+  Last Audio Size: ${this.speechState?.lastAudioBytes || 0} bytes
+  Last Audio Type: ${this.speechState?.lastAudioMimeType || 'unknown'}
+  Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'} ms
+  Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 200)}
   Last Transcript: ${this.speechState?.transcript || 'none'}
   Last Error: ${this.speechState?.lastError || speech.lastError || 'none'}
 `;

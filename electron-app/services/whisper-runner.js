@@ -64,6 +64,7 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeout
   }
 
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
     const outputBase = path.join(os.tmpdir(), `streamvoice-whisper-${Date.now()}`);
     const outputTextPath = `${outputBase}.txt`;
     const args = [
@@ -135,7 +136,12 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeout
       }
 
       resolve({
-        transcript
+        transcript,
+        durationMs: Date.now() - startedAt,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+        binaryPath,
+        modelPath
       });
     });
   });
