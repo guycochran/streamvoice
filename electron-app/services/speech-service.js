@@ -13,7 +13,13 @@ class SpeechService extends EventEmitter {
       transcribing: false,
       model: 'base.en',
       modelStatus: 'not_installed',
+      modelPath: null,
+      binaryPath: null,
       transcript: '',
+      lastTranscriptAt: null,
+      lastCommand: null,
+      lastCommandStatus: null,
+      lastCommandMessage: null,
       lastError: null,
       lastAudioPath: null,
       lastAudioDurationMs: 0
@@ -48,6 +54,9 @@ class SpeechService extends EventEmitter {
       transcribing: false,
       status: 'recording',
       transcript: '',
+      lastCommand: null,
+      lastCommandStatus: null,
+      lastCommandMessage: null,
       lastError: null
     });
   }
@@ -65,7 +74,24 @@ class SpeechService extends EventEmitter {
       transcript,
       transcribing: false,
       status: 'ready',
+      lastTranscriptAt: new Date().toISOString(),
       lastError: null
+    });
+  }
+
+  updateRuntimeConfig(config = {}) {
+    return this.setState({
+      modelStatus: config.modelStatus ?? this.state.modelStatus,
+      modelPath: config.modelPath ?? this.state.modelPath,
+      binaryPath: config.binaryPath ?? this.state.binaryPath
+    });
+  }
+
+  recordCommand(command, result = {}) {
+    return this.setState({
+      lastCommand: command,
+      lastCommandStatus: result.success ? 'success' : 'error',
+      lastCommandMessage: result.message || result.error || null
     });
   }
 

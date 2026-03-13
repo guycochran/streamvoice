@@ -6,6 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { SpeechService } = require('./services/speech-service');
+const { resolveWhisperConfig, transcribeWithWhisper } = require('./services/whisper-runner');
 
 let mainWindow;
 let tray;
@@ -232,7 +233,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.7',
+          message: 'StreamVoice v1.1.0-alpha.8',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -405,6 +406,7 @@ function pushDesktopCommandHistory(entry) {
 
 function getDesktopHealthStatus() {
   const startTime = app.getAppMetrics?.()[0]?.creationTime || Date.now();
+  const speechState = speechService.getState();
 
   return {
     status: desktopObsState.connected ? 'healthy' : 'degraded',
@@ -440,9 +442,13 @@ function getDesktopHealthStatus() {
         lastError: desktopObsState.lastError
       },
       speech: {
-        status: 'unknown',
-        engine: 'WebSpeechAPI',
-        supported: null
+        status: speechState.status || 'unknown',
+        engine: speechState.provider || 'whisper.cpp',
+        supported: speechState.available,
+        model: speechState.model,
+        modelStatus: speechState.modelStatus,
+        lastError: speechState.lastError,
+        lastTranscriptAt: speechState.lastTranscriptAt
       },
       microphone: {
         status: 'unknown',
@@ -462,6 +468,29 @@ function broadcastSpeechState() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('speech-state-updated', speechService.getState());
   }
+}
+
+function updateSpeechRuntimeConfig() {
+  const config = resolveWhisperConfig({
+    appRoot: __dirname,
+    userDataPath: app.getPath('userData')
+  });
+
+  speechService.updateRuntimeConfig({
+    binaryPath: config.binaryPath,
+    modelPath: config.modelPath,
+    modelStatus: config.binaryPath && config.modelPath ? 'ready' : 'not_installed'
+  });
+}
+
+function normalizeSpeechTranscript(transcript) {
+  return String(transcript || '')
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^\w\s%]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 function updateDesktopSubsystemHealth(subsystem, status, extra = {}) {
@@ -882,6 +911,7 @@ app.whenReady().then(() => {
   fs.writeFileSync(backendLogFilePath, '', { flag: 'a' });
   loadDesktopObsSettings();
   speechService.initialize();
+  updateSpeechRuntimeConfig();
   createWindow();
   createTray();
   startBackendServer();
@@ -1042,15 +1072,37 @@ ipcMain.handle('speech-submit-audio', async (_event, payload) => {
     const filePath = await persistSpeechCapture(payload.audioBytes, {
       mimeType: payload.mimeType
     });
-    const state = speechService.completeCapture({
+    speechService.completeCapture({
       filePath,
       durationMs: payload.durationMs
     });
+    updateSpeechRuntimeConfig();
     broadcastSpeechState();
+
+    const { transcript } = await transcribeWithWhisper({
+      audioPath: filePath,
+      appRoot: __dirname,
+      userDataPath: app.getPath('userData')
+    });
+    const normalizedTranscript = normalizeSpeechTranscript(transcript);
+
+    if (!normalizedTranscript) {
+      throw new Error('Whisper returned an empty transcript');
+    }
+
+    speechService.completeTranscript(normalizedTranscript);
+    broadcastSpeechState();
+
+    const commandResult = await executeDesktopCommand(normalizedTranscript);
+    speechService.recordCommand(normalizedTranscript, commandResult);
+    broadcastSpeechState();
+
     return {
       success: true,
       filePath,
-      state
+      transcript: normalizedTranscript,
+      commandResult,
+      state: speechService.getState()
     };
   } catch (error) {
     const state = speechService.fail(error);

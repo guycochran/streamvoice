@@ -10,9 +10,12 @@ class StreamVoiceEnhanced {
         this.apiBaseUrl = this.detectApiBaseUrl();
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
-        this.mediaRecorder = null;
         this.mediaStream = null;
-        this.recordedChunks = [];
+        this.audioContext = null;
+        this.audioSourceNode = null;
+        this.audioProcessorNode = null;
+        this.audioChunks = [];
+        this.audioSampleRate = 16000;
         this.recordingStartedAt = null;
         this.statusPollInterval = null;
         this.serverReachable = false;
@@ -255,6 +258,9 @@ class StreamVoiceEnhanced {
         if (this.hasDesktopBridge && window.electronAPI?.speechGetState) {
             this.updateSubsystemHealth('speech', 'available');
             this.checkMicrophonePermission();
+            window.electronAPI.speechGetState().then((state) => {
+                this.speechState = state;
+            }).catch(() => {});
             return;
         }
 
@@ -387,21 +393,25 @@ class StreamVoiceEnhanced {
     }
 
     async beginDesktopRecording() {
-        if (!this.hasDesktopBridge || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!this.hasDesktopBridge || !navigator.mediaDevices?.getUserMedia || !AudioContextClass) {
             return;
         }
 
         try {
             this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.recordedChunks = [];
+            this.audioChunks = [];
             this.recordingStartedAt = Date.now();
-            this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    this.recordedChunks.push(event.data);
-                }
+            this.audioContext = new AudioContextClass({ sampleRate: 16000 });
+            this.audioSampleRate = this.audioContext.sampleRate;
+            this.audioSourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+            this.audioProcessorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+            this.audioProcessorNode.onaudioprocess = (event) => {
+                const channel = event.inputBuffer.getChannelData(0);
+                this.audioChunks.push(new Float32Array(channel));
             };
-            this.mediaRecorder.start();
+            this.audioSourceNode.connect(this.audioProcessorNode);
+            this.audioProcessorNode.connect(this.audioContext.destination);
         } catch (error) {
             this.result.textContent = `Speech capture error: ${error.message}`;
             this.result.style.color = '#e74c3c';
@@ -409,33 +419,41 @@ class StreamVoiceEnhanced {
     }
 
     async finishDesktopRecording() {
-        if (!this.mediaRecorder) {
+        if (!this.audioContext) {
             return;
         }
 
-        const recorder = this.mediaRecorder;
         const stream = this.mediaStream;
         const startedAt = this.recordingStartedAt || Date.now();
+        const context = this.audioContext;
+        const sourceNode = this.audioSourceNode;
+        const processorNode = this.audioProcessorNode;
+        const chunks = this.audioChunks.slice();
 
-        this.mediaRecorder = null;
         this.mediaStream = null;
+        this.audioContext = null;
+        this.audioSourceNode = null;
+        this.audioProcessorNode = null;
         this.recordingStartedAt = null;
+        this.audioChunks = [];
 
-        await new Promise((resolve) => {
-            recorder.onstop = resolve;
-            recorder.stop();
-        });
-
-        const blob = new Blob(this.recordedChunks, { type: recorder.mimeType || 'audio/webm' });
-        const arrayBuffer = await blob.arrayBuffer();
-        this.recordedChunks = [];
-
+        processorNode?.disconnect();
+        sourceNode?.disconnect();
         stream?.getTracks().forEach((track) => track.stop());
+        await context.close().catch(() => {});
+
+        const wavBytes = this.encodeWavFromChunks(chunks, this.audioSampleRate);
+
+        if (!wavBytes || wavBytes.length === 0) {
+            this.result.textContent = 'Speech capture error: no audio captured';
+            this.result.style.color = '#e74c3c';
+            return;
+        }
 
         if (window.electronAPI?.speechSubmitAudio) {
             const response = await window.electronAPI.speechSubmitAudio({
-                audioBytes: Array.from(new Uint8Array(arrayBuffer)),
-                mimeType: blob.type || 'audio/webm',
+                audioBytes: Array.from(wavBytes),
+                mimeType: 'audio/wav',
                 durationMs: Date.now() - startedAt
             });
 
@@ -444,6 +462,48 @@ class StreamVoiceEnhanced {
                 this.result.style.color = '#e74c3c';
             }
         }
+    }
+
+    encodeWavFromChunks(chunks, sampleRate) {
+        if (!chunks || chunks.length === 0) {
+            return null;
+        }
+
+        const sampleCount = chunks.reduce((total, chunk) => total + chunk.length, 0);
+        const pcmBytes = sampleCount * 2;
+        const buffer = new ArrayBuffer(44 + pcmBytes);
+        const view = new DataView(buffer);
+
+        const writeString = (offset, value) => {
+            for (let i = 0; i < value.length; i++) {
+                view.setUint8(offset + i, value.charCodeAt(i));
+            }
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + pcmBytes, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, pcmBytes, true);
+
+        let offset = 44;
+        chunks.forEach((chunk) => {
+            for (let i = 0; i < chunk.length; i++) {
+                const sample = Math.max(-1, Math.min(1, chunk[i]));
+                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+                offset += 2;
+            }
+        });
+
+        return new Uint8Array(buffer);
     }
 
     bindSpeechState() {
@@ -460,8 +520,18 @@ class StreamVoiceEnhanced {
                 this.transcript.textContent = 'Transcribing...';
                 this.transcript.style.color = '#95a5a6';
                 if (state.lastAudioPath) {
-                    this.result.textContent = `Captured audio ready for Whisper (${Math.round((state.lastAudioDurationMs || 0) / 1000)}s)`;
+                    this.result.textContent = `Captured ${Math.round((state.lastAudioDurationMs || 0) / 1000)}s of audio for Whisper`;
                     this.result.style.color = '#f39c12';
+                }
+            } else if (state.status === 'ready' && state.transcript) {
+                this.transcript.textContent = `Recognized: "${state.transcript}"`;
+                this.transcript.style.color = '#2ecc71';
+                if (state.lastCommandMessage) {
+                    this.result.textContent = state.lastCommandMessage;
+                    this.result.style.color = state.lastCommandStatus === 'error' ? '#e74c3c' : '#2ecc71';
+                } else {
+                    this.result.textContent = 'Transcript ready';
+                    this.result.style.color = '#2ecc71';
                 }
             } else if (state.status === 'error') {
                 this.result.textContent = `Speech error: ${state.lastError}`;
@@ -550,9 +620,12 @@ class StreamVoiceEnhanced {
                 `WebSocket 8090: ${this.wsConnected ? 'connected' : 'disconnected'}`,
                 `OBS 4455: ${this.obsConnected ? 'connected' : 'not connected'}`,
                 `OBS URL: ${this.debugStatus?.obsWebSocketUrl || 'unknown'}`,
+                `Speech Provider: ${this.speechState?.provider || 'unknown'}`,
+                `Speech Model: ${this.speechState?.model || 'unknown'} (${this.speechState?.modelStatus || 'unknown'})`,
                 `Server PID: ${this.debugStatus?.pid || 'unknown'}`,
                 `Uptime: ${this.debugStatus?.uptimeSeconds ?? 'unknown'}s`,
                 `Last OBS error: ${this.debugStatus?.lastObsError || 'none'}`,
+                `Last speech error: ${this.speechState?.lastError || 'none'}`,
                 `Last refresh error: ${this.debugStatus?.lastStateRefreshError || 'none'}`
             ];
             statusDebug.textContent = lines.join('\n');
@@ -1054,6 +1127,10 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Status: ${speech.status || 'unknown'}
   Engine: ${speech.engine || 'unknown'}
   Supported: ${speech.supported !== null ? (speech.supported ? 'Yes' : 'No') : 'unknown'}
+  Model: ${this.speechState?.model || speech.model || 'unknown'}
+  Model Status: ${this.speechState?.modelStatus || speech.modelStatus || 'unknown'}
+  Last Transcript: ${this.speechState?.transcript || 'none'}
+  Last Error: ${this.speechState?.lastError || speech.lastError || 'none'}
 `;
 
         // Microphone
