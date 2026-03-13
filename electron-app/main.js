@@ -258,7 +258,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.23',
+          message: 'StreamVoice v1.1.0-alpha.24',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -559,6 +559,55 @@ function normalizeSpeechTranscript(transcript) {
     .toLowerCase();
 }
 
+function extractDesktopCommand(transcript) {
+  const normalized = normalizeSpeechTranscript(transcript);
+
+  if (!normalized) {
+    return '';
+  }
+
+  const compact = ` ${normalized} `;
+  const includesPhrase = (phrase) => compact.includes(` ${phrase} `);
+
+  const micVolumeMatch = normalized.match(/\bmic volume (\d+)\s*percent\b/);
+  if (micVolumeMatch) {
+    return `mic volume ${micVolumeMatch[1]} percent`;
+  }
+
+  const desktopVolumeMatch = normalized.match(/\bdesktop volume (\d+)\s*percent\b/);
+  if (desktopVolumeMatch) {
+    return `desktop volume ${desktopVolumeMatch[1]} percent`;
+  }
+
+  if (includesPhrase('stream starting setup')) return 'stream starting setup';
+  if (includesPhrase('stream ending setup')) return 'stream ending setup';
+  if (includesPhrase('emergency mute')) return 'emergency mute';
+  if (includesPhrase('subscriber celebration')) return 'subscriber celebration';
+  if (includesPhrase('raid mode')) return 'raid mode';
+  if (includesPhrase('start streaming') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
+  if (includesPhrase('start recording') || includesPhrase('record')) return 'record';
+  if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
+  if (includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
+  if (includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
+
+  if (normalized.includes('switch to ')) {
+    const target = normalized.split('switch to ')[1]?.trim();
+    if (target) {
+      return `switch to ${target}`;
+    }
+  }
+
+  const knownScenes = Array.isArray(desktopObsState.scenes) ? desktopObsState.scenes : [];
+  for (const sceneName of knownScenes) {
+    const lowerScene = String(sceneName).toLowerCase();
+    if (lowerScene && normalized.includes(lowerScene)) {
+      return `switch to ${lowerScene}`;
+    }
+  }
+
+  return normalized;
+}
+
 function updateDesktopSubsystemHealth(subsystem, status, extra = {}) {
   if (subsystem === 'speech') {
     desktopObsState.speech = {
@@ -742,7 +791,7 @@ async function desktopStopRecording() {
 }
 
 async function executeDesktopCommand(command) {
-  const normalized = String(command || '').trim().toLowerCase();
+  const normalized = extractDesktopCommand(command);
   const micVolumeMatch = normalized.match(/^mic volume (\d+)\s*percent$/);
   const desktopVolumeMatch = normalized.match(/^desktop volume (\d+)\s*percent$/);
   let result;
