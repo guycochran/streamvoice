@@ -5,6 +5,7 @@ const OBSWebSocket = require('obs-websocket-js').default;
 const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
+const { SpeechService } = require('./services/speech-service');
 
 let mainWindow;
 let tray;
@@ -12,6 +13,7 @@ let serverProcess;
 let obsSettingsFilePath;
 let backendLogFilePath;
 let desktopObsReconnectTimer = null;
+const speechService = new SpeechService();
 const LOCAL_API_PORT = '3030';
 const LOCAL_WS_PORT = '8090';
 const SERVER_BASE_URL_CANDIDATES = [
@@ -229,7 +231,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.5',
+          message: 'StreamVoice v1.1.0-alpha.6',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -434,6 +436,12 @@ function getDesktopHealthStatus() {
 function broadcastDesktopStatus() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('desktop-status-updated', getDesktopObsStatus());
+  }
+}
+
+function broadcastSpeechState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('speech-state-updated', speechService.getState());
   }
 }
 
@@ -853,6 +861,7 @@ app.whenReady().then(() => {
   backendLogFilePath = path.join(app.getPath('userData'), 'backend.log');
   fs.writeFileSync(backendLogFilePath, '', { flag: 'a' });
   loadDesktopObsSettings();
+  speechService.initialize();
   createWindow();
   createTray();
   startBackendServer();
@@ -902,12 +911,19 @@ ipcMain.handle('desktop-get-status', () => {
 
 ipcMain.handle('desktop-get-health', () => {
   const health = getDesktopHealthStatus();
+  const speechState = speechService.getState();
   if (desktopObsState.speech) {
     health.subsystems.speech = {
       ...health.subsystems.speech,
       ...desktopObsState.speech
     };
   }
+  health.subsystems.speech = {
+    ...health.subsystems.speech,
+    status: speechState.status === 'error' ? 'error' : (speechState.available ? 'available' : health.subsystems.speech.status),
+    engine: speechState.provider,
+    supported: speechState.available
+  };
   if (desktopObsState.microphone) {
     health.subsystems.microphone = {
       ...health.subsystems.microphone,
@@ -983,6 +999,26 @@ ipcMain.handle('desktop-execute-command', async (_event, command) => {
 ipcMain.handle('desktop-update-subsystem-health', (_event, payload) => {
   updateDesktopSubsystemHealth(payload.subsystem, payload.status, payload.extra || {});
   return { success: true };
+});
+
+ipcMain.handle('speech-get-state', () => {
+  return speechService.getState();
+});
+
+ipcMain.handle('speech-start-push-to-talk', () => {
+  const state = speechService.startPushToTalk();
+  broadcastSpeechState();
+  return state;
+});
+
+ipcMain.handle('speech-stop-push-to-talk', () => {
+  const state = speechService.stopPushToTalk();
+  broadcastSpeechState();
+  return state;
+});
+
+speechService.on('state-changed', () => {
+  broadcastSpeechState();
 });
 
 ipcMain.handle('get-server-base-url', async () => {

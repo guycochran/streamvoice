@@ -9,6 +9,7 @@ class StreamVoiceEnhanced {
         this.commandCategories = {};
         this.apiBaseUrl = this.detectApiBaseUrl();
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
+        this.speechState = null;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -41,6 +42,7 @@ class StreamVoiceEnhanced {
         this.setupSpeechRecognition();
         this.setupEventListeners();
         this.loadCommandCategories();
+        this.bindSpeechState();
     }
 
     detectApiBaseUrl() {
@@ -246,6 +248,12 @@ class StreamVoiceEnhanced {
     }
 
     setupSpeechRecognition() {
+        if (this.hasDesktopBridge && window.electronAPI?.speechGetState) {
+            this.updateSubsystemHealth('speech', 'available');
+            this.checkMicrophonePermission();
+            return;
+        }
+
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
             this.showNotification('❌ Speech recognition not supported. Please use Chrome.', 'error');
             this.voiceButton.disabled = true;
@@ -338,6 +346,16 @@ class StreamVoiceEnhanced {
                 console.error('Failed to start recognition:', error);
                 this.stopListening();
             }
+        } else if (!this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStartPushToTalk) {
+            this.isListening = true;
+            this.voiceButton.classList.add('listening');
+            this.voiceFeedback.classList.remove('hidden');
+            this.transcript.textContent = 'Listening...';
+            this.transcript.style.color = '#95a5a6';
+            this.result.textContent = '';
+            window.electronAPI.speechStartPushToTalk().catch((error) => {
+                this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
+            });
         }
     }
 
@@ -350,7 +368,36 @@ class StreamVoiceEnhanced {
             if (this.recognition) {
                 this.recognition.stop();
             }
+        } else if (this.hasDesktopBridge && window.electronAPI?.speechStopPushToTalk) {
+            this.isListening = false;
+            this.voiceButton.classList.remove('listening');
+            this.voiceFeedback.classList.add('hidden');
+            this.transcript.textContent = 'Transcribing...';
+            this.transcript.style.color = '#95a5a6';
+            window.electronAPI.speechStopPushToTalk().catch((error) => {
+                this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
+            });
         }
+    }
+
+    bindSpeechState() {
+        if (!this.hasDesktopBridge || !window.electronAPI?.onSpeechStateUpdated) {
+            return;
+        }
+
+        window.electronAPI.onSpeechStateUpdated((state) => {
+            this.speechState = state;
+            if (state.status === 'recording') {
+                this.transcript.textContent = 'Listening...';
+                this.transcript.style.color = '#95a5a6';
+            } else if (state.status === 'transcribing') {
+                this.transcript.textContent = 'Transcribing...';
+                this.transcript.style.color = '#95a5a6';
+            } else if (state.status === 'error') {
+                this.result.textContent = `Speech error: ${state.lastError}`;
+                this.result.style.color = '#e74c3c';
+            }
+        });
     }
 
     updateConnectionStatus() {
