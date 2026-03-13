@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const os = require('os');
+
+const WHISPER_TIMEOUT_MS = 20000;
 
 function fileExists(filePath) {
   return Boolean(filePath) && fs.existsSync(filePath);
@@ -12,6 +15,13 @@ function formatWhisperExit(code, stderr) {
   }
 
   return stderr.trim() || `Whisper exited with code ${code}`;
+}
+
+function formatWhisperTimeout(stderr) {
+  const details = stderr.trim();
+  return details
+    ? `Whisper timed out before returning a transcript. ${details}`
+    : 'Whisper timed out before returning a transcript.';
 }
 
 function resolveWhisperConfig({ appRoot, userDataPath }) {
@@ -54,11 +64,31 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath }) {
   }
 
   return new Promise((resolve, reject) => {
-    const args = ['-m', modelPath, '-f', audioPath, '-nt', '-of', 'stdout'];
+    const outputBase = path.join(os.tmpdir(), `streamvoice-whisper-${Date.now()}`);
+    const outputTextPath = `${outputBase}.txt`;
+    const args = [
+      '-m', modelPath,
+      '-f', audioPath,
+      '-l', 'en',
+      '-nt',
+      '-np',
+      '-otxt',
+      '-of', outputBase
+    ];
     const child = spawn(binaryPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
     let stderr = '';
+    let settled = false;
+
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      child.kill();
+      reject(new Error(formatWhisperTimeout(stderr)));
+    }, WHISPER_TIMEOUT_MS);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString();
@@ -69,21 +99,40 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath }) {
     });
 
     child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
       reject(error);
     });
 
     child.on('exit', (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+
       if (code !== 0) {
         reject(new Error(formatWhisperExit(code, stderr)));
         return;
       }
 
-      const transcript = stdout
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .join(' ')
-        .trim();
+      let transcript = '';
+      if (fs.existsSync(outputTextPath)) {
+        transcript = fs.readFileSync(outputTextPath, 'utf8').trim();
+        fs.unlinkSync(outputTextPath);
+      }
+
+      if (!transcript) {
+        transcript = stdout
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+      }
 
       resolve({
         transcript
