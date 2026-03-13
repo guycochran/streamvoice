@@ -84,6 +84,23 @@ Target architecture:
 
 Do not put the main app UI renderer in the critical recording path.
 
+## Follow-On Requirement
+
+After native push-to-talk works, add an optional wake-word mode.
+
+Initial target:
+- default wake phrase: `Blue 42`
+- configurable on/off
+- configurable phrase later
+- use wake word to arm a short command window, not permanently open listening
+
+Recommended order:
+1. native push-to-talk works
+2. configurable hotkey works
+3. optional wake-word arming mode
+
+This matters because the target environment can include loud gameplay and kids yelling over headsets. Wake word should be optional and constrained, not the primary first recovery milestone.
+
 ## Files To Read First
 
 - [main.js](/home/guycochran/skunkworks-production-agents/streamvoice/electron-app/main.js)
