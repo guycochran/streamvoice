@@ -9,6 +9,8 @@ function fileExists(filePath) {
 function resolveWhisperConfig({ appRoot, userDataPath }) {
   const candidateBins = [
     process.env.STREAMVOICE_WHISPER_BIN,
+    path.join(appRoot, 'vendor', 'whisper', 'whisper-cli'),
+    path.join(appRoot, 'vendor', 'whisper', 'whisper-cli.exe'),
     path.join(appRoot, 'bin', 'whisper-cli'),
     path.join(appRoot, 'bin', 'whisper-cli.exe'),
     path.join(process.resourcesPath || '', 'whisper', 'whisper-cli.exe'),
@@ -17,6 +19,7 @@ function resolveWhisperConfig({ appRoot, userDataPath }) {
 
   const candidateModels = [
     process.env.STREAMVOICE_WHISPER_MODEL,
+    path.join(appRoot, 'vendor', 'whisper', 'models', 'ggml-base.en.bin'),
     path.join(userDataPath, 'whisper-models', 'ggml-base.en.bin'),
     path.join(appRoot, 'models', 'ggml-base.en.bin'),
     path.join(process.resourcesPath || '', 'whisper', 'models', 'ggml-base.en.bin')

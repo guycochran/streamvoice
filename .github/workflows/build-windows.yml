@@ -34,6 +34,10 @@ jobs:
         # Install dependencies
         npm install
 
+    - name: Prepare Whisper assets
+      working-directory: electron-app
+      run: npm run prepare-whisper
+
     - name: Build Windows installer
       working-directory: electron-app
       env:

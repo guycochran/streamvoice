@@ -1,10 +1,11 @@
 {
   "name": "streamvoice",
-  "version": "1.1.0-alpha.8",
+  "version": "1.1.0-alpha.9",
   "description": "Professional voice control for OBS Studio",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "prepare-whisper": "node scripts/prepare-whisper-assets.js",
     "build-win": "electron-builder --win",
     "dist": "electron-builder",
     "postinstall": "electron-builder install-app-deps"
@@ -35,9 +36,16 @@
       "**/*",
       "!**/*.ts",
       "!**/*.map",
+      "!vendor/whisper/**",
       "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
       "!node_modules/**/*.d.ts"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/whisper",
+        "to": "whisper"
+      }
     ],
     "win": {
       "target": "nsis",
