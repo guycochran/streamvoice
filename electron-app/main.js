@@ -618,6 +618,70 @@ function appendSpeechUploadChunk(uploadId, audioChunk = []) {
   };
 }
 
+async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPath = null }) {
+  const appRoot = __dirname;
+  const userDataPath = app.getPath('userData');
+  const preferredModel = appSettings.speechCommandModel || 'tiny.en';
+  const attempts = [];
+  const seen = new Set();
+
+  const queueAttempt = (audioPath, modelPreference) => {
+    if (!audioPath) {
+      return;
+    }
+
+    const key = `${audioPath}::${modelPreference}`;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    attempts.push({ audioPath, modelPreference });
+  };
+
+  queueAttempt(primaryAudioPath, preferredModel);
+  if (fallbackAudioPath && fallbackAudioPath !== primaryAudioPath) {
+    queueAttempt(fallbackAudioPath, preferredModel);
+  }
+
+  if (preferredModel === 'tiny.en') {
+    queueAttempt(primaryAudioPath, 'base.en');
+    if (fallbackAudioPath && fallbackAudioPath !== primaryAudioPath) {
+      queueAttempt(fallbackAudioPath, 'base.en');
+    }
+  }
+
+  let lastWhisperResult = null;
+
+  for (const attempt of attempts) {
+    const whisperResult = await transcribeWithWhisper({
+      audioPath: attempt.audioPath,
+      appRoot,
+      userDataPath,
+      modelPreference: attempt.modelPreference
+    });
+
+    lastWhisperResult = whisperResult;
+    const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+
+    if (normalizedTranscript) {
+      return {
+        whisperResult,
+        normalizedTranscript,
+        audioPath: attempt.audioPath,
+        modelPreference: attempt.modelPreference
+      };
+    }
+  }
+
+  return {
+    whisperResult: lastWhisperResult,
+    normalizedTranscript: '',
+    audioPath: primaryAudioPath,
+    modelPreference: preferredModel
+  };
+}
+
 async function processSpeechAudioSubmission(audioBytes, payload = {}) {
   latestSpeechPreviewSequence = 0;
   const initialFilePath = await persistSpeechCapture(audioBytes, {
@@ -635,14 +699,29 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
   updateSpeechRuntimeConfig();
   broadcastSpeechState();
 
-  const whisperResult = await transcribeWithWhisper({
-    audioPath: filePath,
-    appRoot: __dirname,
-    userDataPath: app.getPath('userData'),
-    modelPreference: appSettings.speechCommandModel || 'tiny.en'
+  const {
+    whisperResult,
+    normalizedTranscript,
+    audioPath: transcriptionAudioPath
+  } = await transcribeSpeechWithFallback({
+    primaryAudioPath: filePath,
+    fallbackAudioPath: initialFilePath
   });
-  speechService.recordWhisperDiagnostics(whisperResult);
-  const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+
+  if (transcriptionAudioPath && transcriptionAudioPath !== filePath) {
+    const fallbackStats = await fs.promises.stat(transcriptionAudioPath).catch(() => null);
+    speechService.completeCapture({
+      filePath: transcriptionAudioPath,
+      durationMs: payload.durationMs,
+      audioBytes: fallbackStats?.size || (audioBytes?.length || 0),
+      mimeType: payload.mimeType
+    });
+    broadcastSpeechState();
+  }
+
+  if (whisperResult) {
+    speechService.recordWhisperDiagnostics(whisperResult);
+  }
 
   if (!normalizedTranscript) {
     throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
@@ -657,7 +736,7 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
 
   return {
     success: true,
-    filePath,
+    filePath: transcriptionAudioPath || filePath,
     transcript: normalizedTranscript,
     commandResult,
     state: speechService.getState()
@@ -680,14 +759,29 @@ async function processSpeechAudioFile(filePath, payload = {}) {
   updateSpeechRuntimeConfig();
   broadcastSpeechState();
 
-  const whisperResult = await transcribeWithWhisper({
-    audioPath: processedFilePath,
-    appRoot: __dirname,
-    userDataPath: app.getPath('userData'),
-    modelPreference: appSettings.speechCommandModel || 'tiny.en'
+  const {
+    whisperResult,
+    normalizedTranscript,
+    audioPath: transcriptionAudioPath
+  } = await transcribeSpeechWithFallback({
+    primaryAudioPath: processedFilePath,
+    fallbackAudioPath: filePath
   });
-  speechService.recordWhisperDiagnostics(whisperResult);
-  const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+
+  if (transcriptionAudioPath && transcriptionAudioPath !== processedFilePath) {
+    const fallbackStats = await fs.promises.stat(transcriptionAudioPath).catch(() => null);
+    speechService.completeCapture({
+      filePath: transcriptionAudioPath,
+      durationMs: payload.durationMs,
+      audioBytes: fallbackStats?.size || fileStats.size,
+      mimeType: payload.mimeType || 'audio/wav'
+    });
+    broadcastSpeechState();
+  }
+
+  if (whisperResult) {
+    speechService.recordWhisperDiagnostics(whisperResult);
+  }
 
   if (!normalizedTranscript) {
     throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
@@ -702,7 +796,7 @@ async function processSpeechAudioFile(filePath, payload = {}) {
 
   return {
     success: true,
-    filePath: processedFilePath,
+    filePath: transcriptionAudioPath || processedFilePath,
     transcript: normalizedTranscript,
     commandResult,
     state: speechService.getState()
