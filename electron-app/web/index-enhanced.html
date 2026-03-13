@@ -504,6 +504,19 @@
                 </div>
 
                 <div class="settings-section">
+                    <h4>Game Mode</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
+                            <input type="checkbox" id="speech-game-mode" checked style="margin-right: 10px;">
+                            <span>Enable fast command snapping for gameplay</span>
+                        </label>
+                        <div id="speech-game-mode-status" style="font-size: 13px; color: #b9c0d0;">
+                            Game mode favors short shouted commands like <code>mute</code>, <code>live</code>, <code>stop</code>, <code>break</code>, and <code>gameplay</code>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h4>Scene Mapping</h4>
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <p style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
@@ -839,6 +852,8 @@
             const hotkeyStatus = document.getElementById('voice-hotkey-status');
             const modelSelect = document.getElementById('speech-command-model');
             const modelStatus = document.getElementById('speech-command-model-status');
+            const gameModeInput = document.getElementById('speech-game-mode');
+            const gameModeStatus = document.getElementById('speech-game-mode-status');
             const selectedOption = select.options[select.selectedIndex];
             const sceneMappings = {
                 starting: document.getElementById('scene-mapping-starting')?.value || '',
@@ -858,6 +873,7 @@
                     preferredMicDeviceId: select.value || '',
                     preferredMicLabel: selectedOption?.textContent || '',
                     speechCommandModel: modelSelect?.value || 'tiny.en',
+                    speechGameMode: Boolean(gameModeInput?.checked),
                     voiceHotkey: hotkeyInput?.value?.trim() || '',
                     sceneMappings
                 });
@@ -874,6 +890,11 @@
                         ? 'Balanced mode saved. Expect slower but slightly more accurate recognition.'
                         : 'Fast mode saved. Recommended for quick commands during gameplay.';
                 }
+                if (gameModeStatus) {
+                    gameModeStatus.textContent = gameModeInput?.checked
+                        ? 'Game mode saved. Short commands will snap faster during gameplay.'
+                        : 'Game mode disabled. Speech will stay more literal.';
+                }
                 document.getElementById('scene-mapping-status').textContent = 'Saved scene mapping preferences.';
             } catch (error) {
                 status.textContent = `Failed to save microphone selection: ${error.message}`;
@@ -882,6 +903,9 @@
                 }
                 if (modelStatus) {
                     modelStatus.textContent = `Failed to save voice mode: ${error.message}`;
+                }
+                if (gameModeStatus) {
+                    gameModeStatus.textContent = `Failed to save game mode: ${error.message}`;
                 }
             }
         }
@@ -1002,6 +1026,10 @@
                     const modelSelect = document.getElementById('speech-command-model');
                     if (modelSelect) {
                         modelSelect.value = settings.speechCommandModel || 'tiny.en';
+                    }
+                    const gameModeInput = document.getElementById('speech-game-mode');
+                    if (gameModeInput) {
+                        gameModeInput.checked = settings.speechGameMode !== false;
                     }
                 }
 

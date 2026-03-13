@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.6',
+          message: 'StreamVoice v1.1.0-beta.7',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -897,24 +897,43 @@ function normalizeSpeechTranscript(transcript) {
     .toLowerCase();
 }
 
+function normalizeGameModeTranscript(transcript) {
+  return normalizeSpeechTranscript(transcript)
+    .replace(/\b(the|please|can you|could you|would you|hey|okay|ok|now)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function extractDesktopCommand(transcript) {
   const normalized = normalizeSpeechTranscript(transcript);
+  const gameNormalized = appSettings.speechGameMode ? normalizeGameModeTranscript(transcript) : normalized;
+  const activeTranscript = gameNormalized || normalized;
 
-  if (!normalized) {
+  if (!activeTranscript) {
     return '';
   }
 
-  const compact = ` ${normalized} `;
+  const compact = ` ${activeTranscript} `;
   const includesPhrase = (phrase) => compact.includes(` ${phrase} `);
 
-  const micVolumeMatch = normalized.match(/\bmic volume (\d+)\s*percent\b/);
+  const micVolumeMatch = activeTranscript.match(/\bmic volume (\d+)\s*percent\b/);
   if (micVolumeMatch) {
     return `mic volume ${micVolumeMatch[1]} percent`;
   }
 
-  const desktopVolumeMatch = normalized.match(/\bdesktop volume (\d+)\s*percent\b/);
+  const desktopVolumeMatch = activeTranscript.match(/\bdesktop volume (\d+)\s*percent\b/);
   if (desktopVolumeMatch) {
     return `desktop volume ${desktopVolumeMatch[1]} percent`;
+  }
+
+  if (appSettings.speechGameMode) {
+    if (activeTranscript === 'live' || activeTranscript === 'go') return 'start stream';
+    if (activeTranscript === 'stop') return 'stop stream';
+    if (activeTranscript === 'break' || activeTranscript === 'brb') return 'switch to break';
+    if (activeTranscript === 'gameplay' || activeTranscript === 'game') return 'switch to gameplay';
+    if (activeTranscript === 'raid') return 'raid mode';
+    if (activeTranscript === 'record') return 'record';
+    if (activeTranscript === 'screenshot' || activeTranscript === 'shot') return 'screenshot';
   }
 
   if (includesPhrase('stream starting setup')) return 'stream starting setup';
@@ -1429,6 +1448,7 @@ let appSettings = {
   autoConnect: true,
   speechInputMode: 'push_to_talk',
   speechCommandModel: 'tiny.en',
+  speechGameMode: true,
   voiceHotkey: '',
   preferredMicDeviceId: '',
   preferredMicLabel: '',
