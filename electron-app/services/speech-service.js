@@ -51,6 +51,12 @@ class SpeechService extends EventEmitter {
     });
   }
 
+  setMode(mode = 'push_to_talk') {
+    return this.setState({
+      mode: mode === 'latched' ? 'latched' : 'push_to_talk'
+    });
+  }
+
   startPushToTalk() {
     return this.setState({
       recording: true,

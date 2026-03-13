@@ -11,6 +11,7 @@ class StreamVoiceEnhanced {
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
         this.currentMicLevel = 0;
+        this.voiceInputMode = 'push_to_talk';
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -25,6 +26,9 @@ class StreamVoiceEnhanced {
         this.connectionDetails = document.getElementById('connection-details');
         this.voiceButton = document.getElementById('voice-button');
         this.voiceFeedback = document.getElementById('voice-feedback');
+        this.modePttButton = document.getElementById('mode-ptt');
+        this.modeLatchedButton = document.getElementById('mode-latched');
+        this.modeHelp = document.getElementById('mode-help');
         this.transcript = document.getElementById('transcript');
         this.heardCommand = document.getElementById('heard-command');
         this.result = document.getElementById('result');
@@ -41,6 +45,7 @@ class StreamVoiceEnhanced {
             this.connectWebSocket();
         }
         this.loadAppVersion();
+        this.loadVoicePreferences();
         this.startStatusPolling();
         this.setupSpeechRecognition();
         this.setupEventListeners();
@@ -72,6 +77,22 @@ class StreamVoiceEnhanced {
         if (footerVersion) {
             footerVersion.textContent = `v${version}`;
         }
+    }
+
+    async loadVoicePreferences() {
+        if (!window.electronAPI?.getSettings) {
+            this.updateVoiceModeUI();
+            return;
+        }
+
+        try {
+            const settings = await window.electronAPI.getSettings();
+            this.voiceInputMode = settings.speechInputMode || 'push_to_talk';
+        } catch (_error) {
+            this.voiceInputMode = 'push_to_talk';
+        }
+
+        this.updateVoiceModeUI();
     }
 
     connectWebSocket() {
@@ -321,19 +342,52 @@ class StreamVoiceEnhanced {
     }
 
     setupEventListeners() {
-        // Hold-to-talk functionality
-        this.voiceButton.addEventListener('mousedown', () => this.startListening());
-        this.voiceButton.addEventListener('mouseup', () => this.stopListening());
-        this.voiceButton.addEventListener('mouseleave', () => this.stopListening());
+        this.voiceButton.addEventListener('mousedown', () => {
+            if (this.voiceInputMode === 'push_to_talk') {
+                this.startListening();
+            }
+        });
+        this.voiceButton.addEventListener('mouseup', () => {
+            if (this.voiceInputMode === 'push_to_talk') {
+                this.stopListening();
+            }
+        });
+        this.voiceButton.addEventListener('mouseleave', () => {
+            if (this.voiceInputMode === 'push_to_talk') {
+                this.stopListening();
+            }
+        });
+        this.voiceButton.addEventListener('click', (event) => {
+            if (this.voiceInputMode !== 'latched') {
+                return;
+            }
+            event.preventDefault();
+            if (this.isListening) {
+                this.stopListening();
+            } else {
+                this.startListening();
+            }
+        });
 
-        // Touch support for mobile
         this.voiceButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.startListening();
+            if (this.voiceInputMode === 'push_to_talk') {
+                e.preventDefault();
+                this.startListening();
+            }
         });
         this.voiceButton.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.stopListening();
+            if (this.voiceInputMode === 'push_to_talk') {
+                e.preventDefault();
+                this.stopListening();
+            }
+        });
+
+        this.modePttButton?.addEventListener('click', () => {
+            this.setVoiceInputMode('push_to_talk');
+        });
+
+        this.modeLatchedButton?.addEventListener('click', () => {
+            this.setVoiceInputMode('latched');
         });
 
         // Volume sliders
@@ -352,6 +406,44 @@ class StreamVoiceEnhanced {
                 const percent = e.target.value / 100;
                 this.executeCommand(`desktop volume ${Math.round(percent * 100)} percent`, 'slider');
             });
+        }
+    }
+
+    async setVoiceInputMode(mode) {
+        this.voiceInputMode = mode === 'latched' ? 'latched' : 'push_to_talk';
+
+        if (this.isListening) {
+            this.stopListening();
+        }
+
+        this.updateVoiceModeUI();
+
+        if (window.electronAPI?.saveSettings) {
+            try {
+                await window.electronAPI.saveSettings({
+                    speechInputMode: this.voiceInputMode
+                });
+            } catch (_error) {
+                // Ignore persistence failures for now.
+            }
+        }
+    }
+
+    updateVoiceModeUI() {
+        const isLatched = this.voiceInputMode === 'latched';
+
+        this.modePttButton?.classList.toggle('active', !isLatched);
+        this.modeLatchedButton?.classList.toggle('active', isLatched);
+
+        const buttonText = this.voiceButton?.querySelector('.button-text');
+        if (buttonText) {
+            buttonText.textContent = isLatched ? 'Click to Start/Stop' : 'Hold to Speak';
+        }
+
+        if (this.modeHelp) {
+            this.modeHelp.textContent = isLatched
+                ? 'Click once to latch the mic open, click again to transcribe.'
+                : 'Hold the mic button to talk.';
         }
     }
 
@@ -423,6 +515,8 @@ class StreamVoiceEnhanced {
 
         window.electronAPI.onSpeechStateUpdated((state) => {
             this.speechState = state;
+            this.voiceInputMode = state.mode || this.voiceInputMode;
+            this.updateVoiceModeUI();
             this.updateMicLevelDisplay(state.inputLevel || 0, state.selectedMicLabel || 'System Default Microphone');
             if (state.status === 'recording') {
                 this.transcript.textContent = 'Listening...';
@@ -569,6 +663,7 @@ class StreamVoiceEnhanced {
                 `OBS 4455: ${this.obsConnected ? 'connected' : 'not connected'}`,
                 `OBS URL: ${this.debugStatus?.obsWebSocketUrl || 'unknown'}`,
                 `Speech Provider: ${this.speechState?.provider || 'unknown'}`,
+                `Speech Mode: ${this.voiceInputMode === 'latched' ? 'latched' : 'push_to_talk'}`,
                 `Speech Model: ${this.speechState?.model || 'unknown'} (${this.speechState?.modelStatus || 'unknown'})`,
                 `Selected Mic: ${this.speechState?.selectedMicLabel || 'System Default Microphone'}`,
                 `Mic Input Level: ${Math.round((this.speechState?.inputLevel || 0) * 100)}%`,
@@ -1082,6 +1177,7 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Status: ${speech.status || 'unknown'}
   Engine: ${speech.engine || 'unknown'}
   Supported: ${speech.supported !== null ? (speech.supported ? 'Yes' : 'No') : 'unknown'}
+  Mode: ${this.voiceInputMode === 'latched' ? 'latched' : 'push_to_talk'}
   Model: ${this.speechState?.model || speech.model || 'unknown'}
   Model Status: ${this.speechState?.modelStatus || speech.modelStatus || 'unknown'}
   Selected Mic: ${this.speechState?.selectedMicLabel || speech.selectedMicLabel || 'System Default Microphone'}

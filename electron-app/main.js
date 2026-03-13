@@ -257,7 +257,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.19',
+          message: 'StreamVoice v1.1.0-alpha.20',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -538,6 +538,7 @@ function updateSpeechRuntimeConfig() {
     userDataPath: app.getPath('userData')
   });
 
+  speechService.setMode(appSettings.speechInputMode || 'push_to_talk');
   speechService.updateRuntimeConfig({
     binaryPath: config.binaryPath,
     modelPath: config.modelPath,
@@ -1012,6 +1013,7 @@ let appSettings = {
   startWithWindows: false,
   minimizeToTray: true,
   autoConnect: true,
+  speechInputMode: 'push_to_talk',
   preferredMicDeviceId: '',
   preferredMicLabel: ''
 };
@@ -1252,6 +1254,11 @@ ipcMain.handle('save-settings', (event, settings) => {
       openAtLogin: settings.startWithWindows,
       openAsHidden: settings.startWithWindows
     });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(settings, 'speechInputMode')) {
+    speechService.setMode(appSettings.speechInputMode || 'push_to_talk');
+    broadcastSpeechState();
   }
 
   persistAppSettings();
