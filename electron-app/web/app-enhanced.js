@@ -689,6 +689,11 @@ class StreamVoiceEnhanced {
         if (!this.healthStatus || !this.healthStatus.subsystems) return;
 
         const health = this.healthStatus.subsystems;
+        const appHealth = health.app || {};
+        const backendHealth = health.backend || {};
+        const obsHealth = health.obs || {};
+        const speechHealth = health.speech || {};
+        const micHealth = health.microphone || {};
 
         // Update individual subsystem statuses in UI
         const getStatusColor = (status) => {
@@ -710,11 +715,21 @@ class StreamVoiceEnhanced {
             }
         };
 
+        const setValue = (id, value, status = null, fallback = 'UNKNOWN') => {
+            const element = document.getElementById(id);
+            if (!element) return;
+            const safeValue = value ?? fallback;
+            element.textContent = String(safeValue).toUpperCase ? String(safeValue).toUpperCase() : String(safeValue);
+            if (status) {
+                element.style.color = getStatusColor(status);
+            }
+        };
+
         // Update microphone status if element exists
         const micStatus = document.getElementById('mic-status');
-        if (micStatus && health.microphone) {
-            micStatus.textContent = health.microphone.status.toUpperCase();
-            micStatus.style.color = getStatusColor(health.microphone.status);
+        if (micStatus && micHealth) {
+            micStatus.textContent = micHealth.status.toUpperCase();
+            micStatus.style.color = getStatusColor(micHealth.status);
         }
 
         this.updateMicLevelDisplay(
@@ -724,9 +739,68 @@ class StreamVoiceEnhanced {
 
         // Update speech engine status if element exists
         const speechStatus = document.getElementById('speech-status');
-        if (speechStatus && health.speech) {
-            speechStatus.textContent = health.speech.status.toUpperCase();
-            speechStatus.style.color = getStatusColor(health.speech.status);
+        if (speechStatus && speechHealth) {
+            speechStatus.textContent = speechHealth.status.toUpperCase();
+            speechStatus.style.color = getStatusColor(speechHealth.status);
+        }
+
+        const overallStatus = document.getElementById('overall-health-status');
+        if (overallStatus) {
+            const overall = this.healthStatus.status || 'unknown';
+            overallStatus.textContent = overall.toUpperCase();
+            overallStatus.style.color = getStatusColor(overall);
+        }
+
+        const uptime = document.getElementById('system-uptime');
+        if (uptime) {
+            uptime.textContent = appHealth.startTime
+                ? `${Math.floor((Date.now() - appHealth.startTime) / 1000)}s`
+                : '-';
+        }
+
+        const platform = document.getElementById('platform');
+        if (platform) {
+            platform.textContent = navigator.platform || 'Electron';
+        }
+
+        setValue('backend-health', backendHealth.status || 'unknown', backendHealth.status || 'unknown');
+        const backendDetails = document.getElementById('backend-health-details');
+        if (backendDetails) {
+            backendDetails.textContent = backendHealth.httpApi?.status === 'healthy'
+                ? 'Desktop bridge connected'
+                : (backendHealth.httpApi?.lastError || 'Waiting for health data');
+        }
+
+        setValue('http-api-health', backendHealth.httpApi?.status || 'unknown', backendHealth.httpApi?.status || 'unknown');
+        const httpPort = document.getElementById('http-api-port');
+        if (httpPort) {
+            httpPort.textContent = backendHealth.httpApi?.port || '3030';
+        }
+
+        setValue('websocket-health', backendHealth.webSocket?.status || 'unknown', backendHealth.webSocket?.status || 'unknown');
+        const wsClients = document.getElementById('ws-health-clients');
+        if (wsClients) {
+            wsClients.textContent = backendHealth.webSocket?.clients ?? 0;
+        }
+
+        setValue('obs-health', obsHealth.status || 'unknown', obsHealth.status || 'unknown');
+        const obsDetails = document.getElementById('obs-health-details');
+        if (obsDetails) {
+            obsDetails.textContent = obsHealth.connected
+                ? `${obsHealth.url || 'OBS connected'}`
+                : (obsHealth.lastError || 'Not connected');
+        }
+
+        setValue('speech-health', speechHealth.status || 'unknown', speechHealth.status || 'unknown');
+        const speechHealthBlock = document.getElementById('speech-health');
+        if (speechHealthBlock?.nextElementSibling) {
+            speechHealthBlock.nextElementSibling.textContent = `${speechHealth.engine || this.speechState?.provider || 'whisper.cpp'}${speechHealth.model ? ` • ${speechHealth.model}` : ''}`;
+        }
+
+        setValue('mic-health', micHealth.status || 'unknown', micHealth.status || 'unknown');
+        const micDetails = document.getElementById('mic-health-details');
+        if (micDetails) {
+            micDetails.textContent = `${micHealth.selectedMicLabel || this.speechState?.selectedMicLabel || 'System Default Microphone'} • ${Math.round((micHealth.inputLevel ?? this.speechState?.inputLevel ?? 0) * 100)}%`;
         }
 
         // Update detailed connection status
@@ -753,6 +827,22 @@ class StreamVoiceEnhanced {
 
             this.connectionDetails.textContent = parts.join(' | ');
         }
+
+        const connectionInfo = document.getElementById('connection-info');
+        if (connectionInfo) {
+            connectionInfo.textContent = [
+                `Server URL: ${this.apiBaseUrl}`,
+                `WebSocket URL: ws://${new URL(this.apiBaseUrl).hostname}:8090`,
+                `Server Reachable: ${this.serverReachable ? 'Yes' : 'No'}`,
+                `WebSocket Connected: ${this.wsConnected ? 'Yes' : 'No'}`,
+                `OBS Connected: ${this.obsConnected ? 'Yes' : 'No'}`,
+                `Speech Provider: ${this.speechState?.provider || speechHealth.engine || 'unknown'}`,
+                `Speech Mode: ${this.voiceInputMode}`,
+                `Selected Mic: ${this.speechState?.selectedMicLabel || micHealth.selectedMicLabel || 'System Default Microphone'}`
+            ].join('\n');
+        }
+
+        this.renderCommandActivity();
     }
 
     addToHistory(command) {
@@ -1082,12 +1172,8 @@ class StreamVoiceEnhanced {
     }
 
     updateDiagnosticsPanel() {
-        // Update diagnostics panel if visible
-        const diagnosticsPanel = document.getElementById('diagnosticsPanel');
-        if (diagnosticsPanel && diagnosticsPanel.style.display !== 'none') {
-            this.renderHealthStatus();
-            this.renderCommandActivity();
-        }
+        this.renderHealthStatus();
+        this.renderCommandActivity();
     }
 
     renderCommandActivity() {
