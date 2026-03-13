@@ -1051,7 +1051,7 @@ function extractDesktopCommand(transcript) {
   }
 
   if (appSettings.speechGameMode) {
-    if (activeTranscript === 'live' || activeTranscript === 'go') return 'start stream';
+    if (activeTranscript === 'live' || activeTranscript === 'go' || activeTranscript === 'stream') return 'start stream';
     if (activeTranscript === 'stop') return 'stop stream';
     if (activeTranscript === 'break' || activeTranscript === 'brb') return 'switch to break';
     if (activeTranscript === 'gameplay' || activeTranscript === 'game') return 'switch to gameplay';
