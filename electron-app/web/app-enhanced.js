@@ -10,10 +10,6 @@ class StreamVoiceEnhanced {
         this.apiBaseUrl = this.detectApiBaseUrl();
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
-        this.mediaStream = null;
-        this.mediaRecorder = null;
-        this.recordedChunks = [];
-        this.recordingStartedAt = null;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -365,11 +361,6 @@ class StreamVoiceEnhanced {
             this.transcript.textContent = 'Listening...';
             this.transcript.style.color = '#95a5a6';
             this.result.textContent = '';
-            this.beginDesktopRecording().catch((error) => {
-                this.result.textContent = `Speech capture error: ${error.message}`;
-                this.result.style.color = '#e74c3c';
-                this.stopListening();
-            });
             window.electronAPI.speechStartPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
@@ -397,10 +388,6 @@ class StreamVoiceEnhanced {
             this.voiceFeedback.classList.add('hidden');
             this.transcript.textContent = 'Transcribing...';
             this.transcript.style.color = '#95a5a6';
-            this.finishDesktopRecording().catch((error) => {
-                this.result.textContent = `Speech capture error: ${error.message}`;
-                this.result.style.color = '#e74c3c';
-            });
             window.electronAPI.speechStopPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
@@ -413,160 +400,6 @@ class StreamVoiceEnhanced {
                 this.recognition.stop();
             }
         }
-    }
-
-    async beginDesktopRecording() {
-        if (!this.hasDesktopBridge || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-            return;
-        }
-
-        if (this.mediaRecorder) {
-            return;
-        }
-
-        try {
-            this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.recordedChunks = [];
-            this.recordingStartedAt = Date.now();
-            const options = {};
-            if (MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus')) {
-                options.mimeType = 'audio/webm;codecs=opus';
-            } else if (MediaRecorder.isTypeSupported?.('audio/webm')) {
-                options.mimeType = 'audio/webm';
-            }
-            this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    this.recordedChunks.push(event.data);
-                }
-            };
-            this.mediaRecorder.start();
-        } catch (error) {
-            this.mediaStream?.getTracks().forEach((track) => track.stop());
-            this.mediaStream = null;
-            this.mediaRecorder = null;
-            this.recordedChunks = [];
-            this.result.textContent = `Speech capture error: ${error.message}`;
-            this.result.style.color = '#e74c3c';
-            throw error;
-        }
-    }
-
-    async finishDesktopRecording() {
-        if (!this.mediaRecorder) {
-            return;
-        }
-
-        const stream = this.mediaStream;
-        const startedAt = this.recordingStartedAt || Date.now();
-        const recorder = this.mediaRecorder;
-
-        this.mediaStream = null;
-        this.mediaRecorder = null;
-        this.recordingStartedAt = null;
-        await new Promise((resolve) => {
-            recorder.onstop = resolve;
-            recorder.stop();
-        });
-        stream?.getTracks().forEach((track) => track.stop());
-
-        const blob = new Blob(this.recordedChunks, { type: recorder.mimeType || 'audio/webm' });
-        this.recordedChunks = [];
-        const wavBytes = await this.convertBlobToWav(blob);
-
-        if (!wavBytes || wavBytes.length === 0) {
-            this.result.textContent = 'Speech capture error: no audio captured';
-            this.result.style.color = '#e74c3c';
-            return;
-        }
-
-        if (window.electronAPI?.speechSubmitAudio) {
-            const response = await window.electronAPI.speechSubmitAudio({
-                audioBytes: wavBytes,
-                mimeType: 'audio/wav',
-                durationMs: Date.now() - startedAt
-            });
-
-            if (!response.success) {
-                this.result.textContent = `Speech capture error: ${response.error}`;
-                this.result.style.color = '#e74c3c';
-            }
-        }
-    }
-
-    async convertBlobToWav(blob) {
-        if (!blob || blob.size === 0) {
-            return null;
-        }
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) {
-            throw new Error('Audio decoding is not supported in this build');
-        }
-
-        const arrayBuffer = await blob.arrayBuffer();
-        const audioContext = new AudioContextClass();
-        let audioBuffer;
-        try {
-            audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-        } finally {
-            await audioContext.close().catch(() => {});
-        }
-
-        const sampleRate = 16000;
-        const channelData = audioBuffer.getChannelData(0);
-        const pcmData = this.resampleTo16k(channelData, audioBuffer.sampleRate, sampleRate);
-        const pcmBytes = pcmData.length * 2;
-        const buffer = new ArrayBuffer(44 + pcmBytes);
-        const view = new DataView(buffer);
-
-        const writeString = (offset, value) => {
-            for (let i = 0; i < value.length; i++) {
-                view.setUint8(offset + i, value.charCodeAt(i));
-            }
-        };
-
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + pcmBytes, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeString(36, 'data');
-        view.setUint32(40, pcmBytes, true);
-
-        let offset = 44;
-        for (let i = 0; i < pcmData.length; i++) {
-            const sample = Math.max(-1, Math.min(1, pcmData[i]));
-            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-            offset += 2;
-        }
-
-        return new Uint8Array(buffer);
-    }
-
-    resampleTo16k(channelData, inputRate, targetRate) {
-        if (inputRate === targetRate) {
-            return channelData;
-        }
-
-        const ratio = inputRate / targetRate;
-        const outputLength = Math.max(1, Math.round(channelData.length / ratio));
-        const output = new Float32Array(outputLength);
-
-        for (let i = 0; i < outputLength; i++) {
-            const sourceIndex = i * ratio;
-            const lower = Math.floor(sourceIndex);
-            const upper = Math.min(lower + 1, channelData.length - 1);
-            const weight = sourceIndex - lower;
-            output[i] = channelData[lower] * (1 - weight) + channelData[upper] * weight;
-        }
-
-        return output;
     }
 
     bindSpeechState() {

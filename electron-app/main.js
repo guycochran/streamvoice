@@ -9,6 +9,7 @@ const { SpeechService } = require('./services/speech-service');
 const { resolveWhisperConfig, transcribeWithWhisper } = require('./services/whisper-runner');
 
 let mainWindow;
+let speechCaptureWindow;
 let tray;
 let serverProcess;
 let obsSettingsFilePath;
@@ -109,6 +110,28 @@ function createWindow() {
 
   ipcMain.on('window-close', () => {
     mainWindow.hide();
+  });
+}
+
+function createSpeechCaptureWindow() {
+  speechCaptureWindow = new BrowserWindow({
+    width: 1,
+    height: 1,
+    show: false,
+    frame: false,
+    transparent: true,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+      preload: path.join(__dirname, 'speech-capture-preload.js')
+    }
+  });
+
+  speechCaptureWindow.loadFile(path.join(__dirname, 'speech-capture.html'));
+  speechCaptureWindow.on('closed', () => {
+    speechCaptureWindow = null;
   });
 }
 
@@ -233,7 +256,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.13',
+          message: 'StreamVoice v1.1.0-alpha.14',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -913,6 +936,7 @@ app.whenReady().then(() => {
   speechService.initialize();
   updateSpeechRuntimeConfig();
   createWindow();
+  createSpeechCaptureWindow();
   createTray();
   startBackendServer();
   connectDesktopObs();
@@ -928,6 +952,9 @@ app.on('before-quit', () => {
   // Kill the server process
   if (serverProcess) {
     serverProcess.kill();
+  }
+  if (speechCaptureWindow && !speechCaptureWindow.isDestroyed()) {
+    speechCaptureWindow.destroy();
   }
   clearTimeout(desktopObsReconnectTimer);
   desktopObs.disconnect().catch(() => {});
@@ -1057,14 +1084,26 @@ ipcMain.handle('speech-get-state', () => {
 
 ipcMain.handle('speech-start-push-to-talk', () => {
   const state = speechService.startPushToTalk();
+  speechCaptureWindow?.webContents.send('speech-capture-start');
   broadcastSpeechState();
   return state;
 });
 
 ipcMain.handle('speech-stop-push-to-talk', () => {
   const state = speechService.stopPushToTalk();
+  speechCaptureWindow?.webContents.send('speech-capture-stop');
   broadcastSpeechState();
   return state;
+});
+
+ipcMain.on('speech-capture-error', (_event, message) => {
+  speechService.fail(message || 'Speech capture failed');
+  broadcastSpeechState();
+});
+
+ipcMain.on('speech-capture-ready', () => {
+  updateSpeechRuntimeConfig();
+  broadcastSpeechState();
 });
 
 ipcMain.handle('speech-submit-audio', async (_event, payload) => {

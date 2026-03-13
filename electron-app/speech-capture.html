@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>StreamVoice Speech Capture</title>
+</head>
+<body>
+  <script>
+    (() => {
+      let mediaStream = null;
+      let mediaRecorder = null;
+      let recordedChunks = [];
+      let recordingStartedAt = null;
+
+      async function startCapture() {
+        if (mediaRecorder) {
+          return;
+        }
+
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          recordedChunks = [];
+          recordingStartedAt = Date.now();
+
+          const options = {};
+          if (window.MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus')) {
+            options.mimeType = 'audio/webm;codecs=opus';
+          } else if (window.MediaRecorder?.isTypeSupported?.('audio/webm')) {
+            options.mimeType = 'audio/webm';
+          }
+
+          mediaRecorder = new MediaRecorder(mediaStream, options);
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              recordedChunks.push(event.data);
+            }
+          };
+          mediaRecorder.start();
+        } catch (error) {
+          window.speechCaptureAPI.reportError(error.message);
+        }
+      }
+
+      async function stopCapture() {
+        if (!mediaRecorder) {
+          return;
+        }
+
+        const recorder = mediaRecorder;
+        const stream = mediaStream;
+        const startedAt = recordingStartedAt || Date.now();
+        mediaRecorder = null;
+        mediaStream = null;
+        recordingStartedAt = null;
+
+        await new Promise((resolve) => {
+          recorder.onstop = resolve;
+          recorder.stop();
+        });
+
+        stream?.getTracks().forEach((track) => track.stop());
+
+        try {
+          const blob = new Blob(recordedChunks, { type: recorder.mimeType || 'audio/webm' });
+          recordedChunks = [];
+          const audioBytes = new Uint8Array(await blob.arrayBuffer());
+
+          await window.speechCaptureAPI.submitAudio({
+            audioBytes,
+            mimeType: blob.type || 'audio/webm',
+            durationMs: Date.now() - startedAt
+          });
+        } catch (error) {
+          window.speechCaptureAPI.reportError(error.message);
+        }
+      }
+
+      window.speechCaptureAPI.onStart(() => {
+        startCapture();
+      });
+
+      window.speechCaptureAPI.onStop(() => {
+        stopCapture();
+      });
+
+      window.speechCaptureAPI.reportReady();
+    })();
+  </script>
+</body>
+</html>
