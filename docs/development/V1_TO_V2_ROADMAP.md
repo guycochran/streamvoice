@@ -55,6 +55,7 @@ This stage is about creating strong day-to-day value.
 #### Must-Have Work
 - ship editable macros
 - ship reusable templates
+- add structured profile/mapping support for scenes, sources, aliases, and workflows
 - add common streamer workflows:
   - start stream
   - end stream
@@ -116,6 +117,7 @@ Focus: user-configurable value
 
 - custom command aliases
 - editable macros
+- scene/source target mapping UI
 - import/export settings
 - saved profiles for different stream setups
 
