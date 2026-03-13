@@ -79,7 +79,7 @@ let lastStateRefreshError = null;
 const systemHealth = {
   app: {
     status: 'healthy',
-    version: '1.1.0-alpha.16',
+    version: '1.1.0-beta.7',
     startTime: Date.now(),
     pid: process.pid,
     lastError: null
@@ -108,8 +108,8 @@ const systemHealth = {
   },
   speech: {
     status: 'unknown', // available, unavailable, unknown
-    engine: 'WebSpeechAPI',
-    supported: null
+    engine: 'whisper.cpp',
+    supported: true
   },
   microphone: {
     status: 'unknown', // available, unavailable, permission_denied, unknown

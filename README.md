@@ -1,123 +1,56 @@
 # StreamVoice
 
-Professional voice control for OBS Studio. Control your streams hands-free with natural voice commands.
+Desktop voice control for OBS Studio.
 
-![Version](https://img.shields.io/badge/version-v1.0.0-brightgreen) ![Platform](https://img.shields.io/badge/platform-windows-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Status](https://img.shields.io/badge/status-stable-success)
+## Current Status
 
-## 🎤 What is StreamVoice?
+StreamVoice is currently in beta stabilization.
 
-StreamVoice gives you hands-free control of OBS Studio through natural voice commands. Built as a desktop application, it runs quietly in your system tray and responds instantly when you need it. No more interrupting gameplay to switch scenes or manage your stream.
+Working in packaged Windows builds:
+- native voice capture
+- local Whisper transcription
+- OBS command execution
+- scene inventory and scene mapping
+- microphone selection and VU metering
+- configurable global voice hotkey
 
-### ✨ Key Features
+Current app version in repo:
+- `1.1.0-beta.7`
 
-- **70+ Voice Commands** - Control scenes, sources, recording, streaming, audio, and more
-- **Natural Language** - Say "switch to my game" instead of memorizing exact commands
-- **Desktop Application** - Professional Windows app with auto-updates
-- **System Tray** - Runs quietly in the background
-- **Hold-to-Talk** - Crystal clear voice recognition
-- **Zero Configuration** - Works with OBS defaults
+For a concise engineering snapshot, start with [docs/development/CURRENT_STATE.md](docs/development/CURRENT_STATE.md).
 
-## 📥 Download
+## Architecture
 
-### Windows Installer (v1.0.0)
-**[Download StreamVoice Setup (Windows)](https://github.com/guycochran/streamvoice/releases/download/v1.0.0/StreamVoice-Setup-1.0.0.exe)**
+Active production path:
+- Electron main owns the speech lifecycle
+- native Windows recorder sidecar captures `16kHz` mono WAV
+- `whisper.cpp` performs local transcription
+- transcript is routed into the desktop OBS command executor
+- renderer is UI only
 
-*Requires Windows 10 or later • 76.8 MB*
+## Confirmed Working Voice Examples
 
-### Other Platforms
-macOS and Linux support coming soon!
+- `mute microphone`
+- `switch scene to gameplay`
+- `start stream`
+- `stop stream`
 
-## 🚀 Getting Started
+## Setup
 
-### 1. Setup OBS Studio
+1. Open OBS Studio.
+2. Enable the OBS WebSocket server.
+3. Launch StreamVoice.
+4. Select your microphone in Settings if needed.
+5. Use push-to-talk, latched mode, or the configured global hotkey.
 
-StreamVoice requires OBS Studio with WebSocket enabled:
+## Current Priorities
 
-1. Open OBS Studio (v27 or later)
-2. Go to **Tools** → **WebSocket Server Settings**
-3. Check ✅ **Enable WebSocket Server**
-4. Leave **Enable Authentication** unchecked (or see troubleshooting if you need a password)
-5. Server Port: **4455** (default)
-6. Click **OK**
+- beta hardening
+- command alias coverage
+- hotkey UX polish
+- diagnostics cleanup
+- optional wake-word mode later
 
-### 2. Install StreamVoice
+## License
 
-1. Download the installer above
-2. Run `StreamVoice-Setup.exe`
-3. Follow the installation wizard
-4. StreamVoice will launch automatically
-
-### 3. Connect to OBS
-
-1. StreamVoice will automatically connect when OBS is running
-2. Look for green "OBS: Connected" status in the app
-3. If it shows "OBS: Checking..." - see troubleshooting below
-
-## 🎤 Voice Commands
-
-Hold the microphone button and speak naturally:
-
-### Scene Control
-- "Switch to gameplay"
-- "Go to starting soon"
-- "Show my webcam scene"
-- "Back to desktop"
-
-### Recording & Streaming
-- "Start recording"
-- "Stop streaming"
-- "Pause the recording"
-
-### Audio Control
-- "Mute my mic"
-- "Increase game audio"
-- "Lower desktop sound"
-
-### Quick Actions
-- "Take a screenshot"
-- "Enable green screen"
-- "Hide my webcam"
-
-[View all 70+ commands →](https://github.com/guycochran/streamvoice/wiki/Commands)
-
-## 🛠️ Troubleshooting
-
-### Can't Connect to OBS?
-1. Make sure OBS is running
-2. Check WebSocket is enabled in OBS settings
-3. Verify the password is correct
-4. Try restarting both applications
-
-### Voice Commands Not Working?
-1. Click "Allow" when Chrome asks for microphone permission
-2. Hold the button while speaking
-3. Speak clearly and naturally
-4. Make sure your mic is working in Windows
-
-### Need Help?
-- [Documentation](https://github.com/guycochran/streamvoice/wiki)
-- [Report an Issue](https://github.com/guycochran/streamvoice/issues)
-- [Discussions](https://github.com/guycochran/streamvoice/discussions)
-
-## 🤝 Contributing
-
-StreamVoice is open source and welcomes contributions!
-
-- Report bugs or request features in [Issues](https://github.com/guycochran/streamvoice/issues)
-- Submit improvements via [Pull Requests](https://github.com/guycochran/streamvoice/pulls)
-- Share your experience in [Discussions](https://github.com/guycochran/streamvoice/discussions)
-
-## 📄 License
-
-StreamVoice is MIT licensed. See [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-Special thanks to:
-- The OBS Project for WebSocket support
-- Early beta testers who provided invaluable feedback
-- The streaming community for inspiration
-
----
-
-**Built with ❤️ for streamers**
+StreamVoice is MIT licensed. See [LICENSE](LICENSE).
