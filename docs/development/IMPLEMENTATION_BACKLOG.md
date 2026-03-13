@@ -243,6 +243,50 @@ This backlog translates the product analysis and roadmap into concrete execution
   - mappings persist across restarts
   - diagnostics show whether scene discovery succeeded
 
+### SV-022: Scene Alias Mapping
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - users can assign friendly aliases to scenes so voice commands work with real-world names and abbreviations
+- Acceptance criteria:
+  - user can assign multiple aliases to a scene
+  - aliases support examples like `pip`, `picture in picture`, `camera 1`, `browser`, and `powerpoint`
+  - voice commands resolve aliases before falling back to raw scene-name matching
+  - aliases persist across restarts
+
+### SV-023: Source And Overlay Toggle Controls
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - users can show/hide common OBS sources and overlays by voice or button
+- Acceptance criteria:
+  - source picker can list visible OBS inputs/browser sources when connected
+  - user can map commands like `show chat`, `hide chat`, `show webcam`, `hide overlay`
+  - command execution confirms whether the target source changed visibility
+  - mappings persist across restarts
+
+### SV-024: Replay And Clip Workflow
+- Priority: `P1`
+- Target version: `v1.4.0`
+- Outcome:
+  - users can trigger replay-buffer saves and clip workflows during live use
+- Acceptance criteria:
+  - app can detect replay buffer availability
+  - `save replay`, `clip that`, or mapped aliases execute reliably
+  - failures are reported clearly if replay buffer is off
+
+### SV-025: Streamer Preset Packs
+- Priority: `P2`
+- Target version: `v1.4.0`
+- Outcome:
+  - ship ready-made mappings for common creator setups
+- Acceptance criteria:
+  - include presets for:
+    - single-camera gameplay
+    - multi-camera / podcast
+    - presentation / browser / PiP
+  - presets can populate scenes, aliases, and macro suggestions
+
 ## P1: Product Validation
 
 ### SV-019: Real User Test Plan

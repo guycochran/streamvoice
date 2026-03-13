@@ -54,8 +54,18 @@ Renderer role:
 2. command alias coverage
 3. hotkey UX polish
 4. diagnostics wording cleanup
-5. macOS recorder sidecar
-6. optional wake-word mode later
+5. beta tester readiness
+6. macOS recorder sidecar
+7. optional wake-word mode later
+
+## Beta Tester Readiness
+
+Before widening beta access, the app should feel solid in these areas:
+- short voice commands under normal home noise
+- stable command feedback for start/stop stream, mute/unmute, scene switch, screenshot
+- clearer diagnostics with fewer placeholder states
+- reliable microphone selection and hotkey setup
+- basic streamer mappings for scenes like `PiP`, `Camera 1`, `Browser`, `Chat`, and `PowerPoint`
 
 ## Wake Word Direction
 

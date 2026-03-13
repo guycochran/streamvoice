@@ -56,6 +56,8 @@ This stage is about creating strong day-to-day value.
 - ship editable macros
 - ship reusable templates
 - add structured profile/mapping support for scenes, sources, aliases, and workflows
+- add scene aliases so names like `PiP`, `Camera 1`, `Browser`, and `PowerPoint` are easy to invoke by voice
+- add source and browser-source toggles for streamer overlays such as chat, webcam, lower thirds, and alerts
 - add common streamer workflows:
   - start stream
   - end stream
@@ -118,6 +120,8 @@ Focus: user-configurable value
 - custom command aliases
 - editable macros
 - scene/source target mapping UI
+- scene alias editor
+- source visibility toggles for chat/webcam/overlay workflows
 - import/export settings
 - saved profiles for different stream setups
 
@@ -134,6 +138,7 @@ Focus: live-production leverage
 
 - killer macro pack
 - replay/clip workflows
+- chat overlay / webcam / PiP control presets
 - panic mode
 - creator templates
 
@@ -162,6 +167,7 @@ These are the highest-leverage next product steps.
 3. Make failures legible
 4. Improve visible trust cues
 5. Validate with streamers, not just internal testing
+6. Validate chat, PiP, browser-source, and multi-camera workflows
 
 ## Five Flagship Workflows To Prioritize
 These should become the product’s headline capabilities.
@@ -193,6 +199,12 @@ These should become the product’s headline capabilities.
    - stop stream
    - stop recording
    - reset overlays and audio
+
+6. Chat And Overlay Workflow
+   - show chat
+   - hide chat
+   - toggle webcam
+   - toggle PiP / browser overlay
 
 ## Success Metrics
 If StreamVoice is going to become a serious product, these metrics matter more than raw download count.
