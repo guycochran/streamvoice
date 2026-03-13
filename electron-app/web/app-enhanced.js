@@ -754,6 +754,8 @@ class StreamVoiceEnhanced {
                 `Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'}ms`,
                 `Last Whisper Model: ${this.speechState?.lastWhisperModel || 'unknown'}`,
                 `Last Whisper Audio Path: ${this.speechState?.lastWhisperAudioPath || 'none'}`,
+                `Last Whisper Attempts: ${this.speechState?.lastWhisperAttemptCount ?? 0}`,
+                `Last Whisper Fallback: ${this.speechState?.lastWhisperFallbackUsed ? 'yes' : 'no'}`,
                 `Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 160)}`,
                 `Server PID: ${this.debugStatus?.pid || 'unknown'}`,
                 `Uptime: ${this.debugStatus?.uptimeSeconds ?? 'unknown'}s`,

@@ -653,8 +653,10 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
 
   let lastWhisperResult = null;
   let lastError = null;
+  let attemptCount = 0;
 
   for (const attempt of attempts) {
+    attemptCount += 1;
     try {
       const whisperResult = await transcribeWithWhisper({
         audioPath: attempt.audioPath,
@@ -666,7 +668,9 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
       lastWhisperResult = {
         ...whisperResult,
         audioPath: attempt.audioPath,
-        modelPreference: attempt.modelPreference
+        modelPreference: attempt.modelPreference,
+        attemptCount,
+        fallbackUsed: attemptCount > 1
       };
       const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
 
@@ -687,7 +691,9 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
         stderr: error.message,
         audioPath: attempt.audioPath,
         modelPreference: attempt.modelPreference,
-        modelName: attempt.modelPreference
+        modelName: attempt.modelPreference,
+        attemptCount,
+        fallbackUsed: attemptCount > 1
       };
     }
   }
@@ -1094,7 +1100,7 @@ function updateDesktopSubsystemHealth(subsystem, status, extra = {}) {
     desktopObsState.speech = {
       ...(desktopObsState.speech || {}),
       status,
-      engine: 'WebSpeechAPI',
+      engine: 'whisper.cpp',
       ...extra
     };
   }

@@ -36,6 +36,8 @@ class SpeechService extends EventEmitter {
       lastWhisperStderr: '',
       lastWhisperAudioPath: null,
       lastWhisperModel: null,
+      lastWhisperAttemptCount: 0,
+      lastWhisperFallbackUsed: false,
       inputLevel: 0,
       selectedMicDeviceId: '',
       selectedMicLabel: ''
@@ -167,7 +169,9 @@ class SpeechService extends EventEmitter {
       lastWhisperStdout: details.stdout || this.state.lastWhisperStdout,
       lastWhisperStderr: details.stderr || this.state.lastWhisperStderr,
       lastWhisperAudioPath: details.audioPath || this.state.lastWhisperAudioPath,
-      lastWhisperModel: details.modelPreference || details.modelName || this.state.lastWhisperModel
+      lastWhisperModel: details.modelPreference || details.modelName || this.state.lastWhisperModel,
+      lastWhisperAttemptCount: details.attemptCount ?? this.state.lastWhisperAttemptCount,
+      lastWhisperFallbackUsed: details.fallbackUsed ?? this.state.lastWhisperFallbackUsed
     });
   }
 
