@@ -652,32 +652,54 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
   }
 
   let lastWhisperResult = null;
+  let lastError = null;
 
   for (const attempt of attempts) {
-    const whisperResult = await transcribeWithWhisper({
-      audioPath: attempt.audioPath,
-      appRoot,
-      userDataPath,
-      modelPreference: attempt.modelPreference
-    });
+    try {
+      const whisperResult = await transcribeWithWhisper({
+        audioPath: attempt.audioPath,
+        appRoot,
+        userDataPath,
+        modelPreference: attempt.modelPreference
+      });
 
-    lastWhisperResult = whisperResult;
-    const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
-
-    if (normalizedTranscript) {
-      return {
-        whisperResult,
-        normalizedTranscript,
+      lastWhisperResult = {
+        ...whisperResult,
         audioPath: attempt.audioPath,
         modelPreference: attempt.modelPreference
       };
+      const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+
+      if (normalizedTranscript) {
+        return {
+          whisperResult: lastWhisperResult,
+          normalizedTranscript,
+          audioPath: attempt.audioPath,
+          modelPreference: attempt.modelPreference
+        };
+      }
+    } catch (error) {
+      lastError = error;
+      lastWhisperResult = {
+        transcript: '',
+        durationMs: null,
+        stdout: '',
+        stderr: error.message,
+        audioPath: attempt.audioPath,
+        modelPreference: attempt.modelPreference,
+        modelName: attempt.modelPreference
+      };
     }
+  }
+
+  if (lastError && !lastWhisperResult?.transcript) {
+    throw lastError;
   }
 
   return {
     whisperResult: lastWhisperResult,
     normalizedTranscript: '',
-    audioPath: primaryAudioPath,
+    audioPath: lastWhisperResult?.audioPath || primaryAudioPath,
     modelPreference: preferredModel
   };
 }

@@ -34,6 +34,8 @@ class SpeechService extends EventEmitter {
       lastWhisperDurationMs: null,
       lastWhisperStdout: '',
       lastWhisperStderr: '',
+      lastWhisperAudioPath: null,
+      lastWhisperModel: null,
       inputLevel: 0,
       selectedMicDeviceId: '',
       selectedMicLabel: ''
@@ -163,7 +165,9 @@ class SpeechService extends EventEmitter {
     return this.setState({
       lastWhisperDurationMs: details.durationMs ?? this.state.lastWhisperDurationMs,
       lastWhisperStdout: details.stdout || this.state.lastWhisperStdout,
-      lastWhisperStderr: details.stderr || this.state.lastWhisperStderr
+      lastWhisperStderr: details.stderr || this.state.lastWhisperStderr,
+      lastWhisperAudioPath: details.audioPath || this.state.lastWhisperAudioPath,
+      lastWhisperModel: details.modelPreference || details.modelName || this.state.lastWhisperModel
     });
   }
 
