@@ -76,10 +76,12 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeout
     const startedAt = Date.now();
     const outputBase = path.join(os.tmpdir(), `streamvoice-whisper-${Date.now()}`);
     const outputTextPath = `${outputBase}.txt`;
+    const threadCount = String(Math.max(1, Math.min(os.cpus().length || 1, modelPreference === 'tiny.en' ? 8 : 6)));
     const args = [
       '-m', modelPath,
       '-f', audioPath,
       '-l', 'en',
+      '-t', threadCount,
       '-nt',
       '-np',
       '-otxt',

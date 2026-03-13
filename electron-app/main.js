@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.5',
+          message: 'StreamVoice v1.1.0-beta.6',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -417,7 +417,8 @@ async function startSpeechCaptureFlow() {
   }
 
   const captureConfig = {
-    deviceId: appSettings.preferredMicDeviceId || ''
+    deviceId: appSettings.preferredMicDeviceId || '',
+    previewEnabled: (appSettings.speechCommandModel || 'tiny.en') !== 'tiny.en'
   };
   speechCaptureWindow?.webContents.send('speech-capture-start', captureConfig);
   speechCaptureWindow?.webContents.executeJavaScript(`
@@ -524,6 +525,65 @@ async function persistSpeechCapture(audioBytes, metadata = {}) {
   return filePath;
 }
 
+async function trimSilenceFromWav(filePath, options = {}) {
+  const threshold = options.threshold ?? 900;
+  const minSilenceSamples = options.minSilenceSamples ?? 1600;
+  const raw = await fs.promises.readFile(filePath);
+
+  if (raw.length <= 44) {
+    return filePath;
+  }
+
+  const riff = raw.toString('ascii', 0, 4);
+  const wave = raw.toString('ascii', 8, 12);
+  if (riff !== 'RIFF' || wave !== 'WAVE') {
+    return filePath;
+  }
+
+  const audioFormat = raw.readUInt16LE(20);
+  const channels = raw.readUInt16LE(22);
+  const sampleRate = raw.readUInt32LE(24);
+  const bitsPerSample = raw.readUInt16LE(34);
+  const dataSize = raw.readUInt32LE(40);
+
+  if (audioFormat !== 1 || channels !== 1 || bitsPerSample !== 16 || sampleRate !== 16000) {
+    return filePath;
+  }
+
+  const sampleCount = Math.floor(dataSize / 2);
+  let startSample = 0;
+  let endSample = sampleCount - 1;
+
+  const readSample = (index) => Math.abs(raw.readInt16LE(44 + (index * 2)));
+
+  while (startSample < sampleCount && readSample(startSample) < threshold) {
+    startSample += 1;
+  }
+
+  while (endSample > startSample && readSample(endSample) < threshold) {
+    endSample -= 1;
+  }
+
+  startSample = Math.max(0, startSample - minSilenceSamples);
+  endSample = Math.min(sampleCount - 1, endSample + minSilenceSamples);
+
+  if (startSample <= 0 && endSample >= sampleCount - 1) {
+    return filePath;
+  }
+
+  const trimmedSampleCount = Math.max(1, endSample - startSample + 1);
+  const trimmedDataSize = trimmedSampleCount * 2;
+  const trimmed = Buffer.alloc(44 + trimmedDataSize);
+  raw.copy(trimmed, 0, 0, 44);
+  raw.copy(trimmed, 44, 44 + (startSample * 2), 44 + ((endSample + 1) * 2));
+  trimmed.writeUInt32LE(36 + trimmedDataSize, 4);
+  trimmed.writeUInt32LE(trimmedDataSize, 40);
+
+  const trimmedPath = filePath.replace(/\.wav$/i, '-trimmed.wav');
+  await fs.promises.writeFile(trimmedPath, trimmed);
+  return trimmedPath;
+}
+
 function createSpeechUploadSession(metadata = {}) {
   const uploadId = `speech-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   speechUploadSessions.set(uploadId, {
@@ -555,9 +615,12 @@ function appendSpeechUploadChunk(uploadId, audioChunk = []) {
 
 async function processSpeechAudioSubmission(audioBytes, payload = {}) {
   latestSpeechPreviewSequence = 0;
-  const filePath = await persistSpeechCapture(audioBytes, {
+  const initialFilePath = await persistSpeechCapture(audioBytes, {
     mimeType: payload.mimeType
   });
+  const filePath = (appSettings.speechCommandModel || 'tiny.en') === 'tiny.en' && (payload.mimeType || '').includes('wav')
+    ? await trimSilenceFromWav(initialFilePath)
+    : initialFilePath;
   speechService.completeCapture({
     filePath,
     durationMs: payload.durationMs,
@@ -598,10 +661,13 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
 
 async function processSpeechAudioFile(filePath, payload = {}) {
   latestSpeechPreviewSequence = 0;
-  const fileStats = await fs.promises.stat(filePath);
+  const processedFilePath = (appSettings.speechCommandModel || 'tiny.en') === 'tiny.en' && (payload.mimeType || 'audio/wav').includes('wav')
+    ? await trimSilenceFromWav(filePath)
+    : filePath;
+  const fileStats = await fs.promises.stat(processedFilePath);
 
   speechService.completeCapture({
-    filePath,
+    filePath: processedFilePath,
     durationMs: payload.durationMs,
     audioBytes: fileStats.size,
     mimeType: payload.mimeType || 'audio/wav'
@@ -610,7 +676,7 @@ async function processSpeechAudioFile(filePath, payload = {}) {
   broadcastSpeechState();
 
   const whisperResult = await transcribeWithWhisper({
-    audioPath: filePath,
+    audioPath: processedFilePath,
     appRoot: __dirname,
     userDataPath: app.getPath('userData'),
     modelPreference: appSettings.speechCommandModel || 'tiny.en'
@@ -631,7 +697,7 @@ async function processSpeechAudioFile(filePath, payload = {}) {
 
   return {
     success: true,
-    filePath,
+    filePath: processedFilePath,
     transcript: normalizedTranscript,
     commandResult,
     state: speechService.getState()

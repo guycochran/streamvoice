@@ -21,6 +21,7 @@
       let previewInFlight = false;
       let previewSequence = 0;
       const FINAL_UPLOAD_CHUNK_SIZE = 8192;
+      let previewEnabled = true;
 
       function getConstraints(deviceId = '') {
         if (deviceId) {
@@ -189,6 +190,7 @@
         try {
           window.speechCaptureAPI.reportLifecycle({ capturePhase: 'start_requested' });
           await ensureStream(config.deviceId || '');
+          previewEnabled = config.previewEnabled !== false;
           recordedChunks = [];
           recordingStartedAt = Date.now();
 
@@ -218,9 +220,11 @@
           if (previewTimer) {
             clearInterval(previewTimer);
           }
-          previewTimer = setInterval(() => {
-            submitPreview(false);
-          }, 2500);
+          if (previewEnabled) {
+            previewTimer = setInterval(() => {
+              submitPreview(false);
+            }, 2500);
+          }
         } catch (error) {
           window.speechCaptureAPI.reportError(error.message);
         }
