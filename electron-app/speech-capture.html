@@ -250,8 +250,10 @@
 
         try {
           const previewBytes = await decodeChunksToWav(recordedChunks);
+          // Convert Uint8Array to regular array for IPC serialization
+          const previewArray = Array.from(previewBytes);
           await window.speechCaptureAPI.submitPreviewAudio({
-            audioBytes: previewBytes,
+            audioBytes: previewArray,
             mimeType: 'audio/wav',
             durationMs,
             sequence: currentSequence
@@ -337,15 +339,35 @@
           });
           recordedChunks = [];
 
-          await window.speechCaptureAPI.submitAudio({
-            audioBytes,
-            mimeType: 'audio/wav',
-            durationMs: Date.now() - startedAt
-          });
-          window.speechCaptureAPI.reportLifecycle({ capturePhase: 'final_submit_sent' });
+          try {
+            // Convert Uint8Array to regular array for IPC serialization
+            const audioArray = Array.from(audioBytes);
+            const submitResult = await window.speechCaptureAPI.submitAudio({
+              audioBytes: audioArray,
+              mimeType: 'audio/wav',
+              durationMs: Date.now() - startedAt
+            });
+
+            if (submitResult && submitResult.success === false) {
+              throw new Error(submitResult.error || 'Audio submission failed');
+            }
+
+            window.speechCaptureAPI.reportLifecycle({ capturePhase: 'final_submit_sent' });
+          } catch (submitError) {
+            window.speechCaptureAPI.reportLifecycle({
+              capturePhase: 'final_submit_error',
+              lastError: `IPC submission failed: ${submitError.message}`
+            });
+            window.speechCaptureAPI.reportError(`Failed to submit audio: ${submitError.message}`);
+            console.error('Audio submission error:', submitError);
+          }
         } catch (error) {
-          window.speechCaptureAPI.reportLifecycle({ capturePhase: 'final_submit_error' });
+          window.speechCaptureAPI.reportLifecycle({
+            capturePhase: 'final_submit_error',
+            lastError: `Capture processing failed: ${error.message}`
+          });
           window.speechCaptureAPI.reportError(error.message);
+          console.error('Capture processing error:', error);
         }
       }
 
