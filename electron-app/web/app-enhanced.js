@@ -14,6 +14,7 @@ class StreamVoiceEnhanced {
         this.audioContext = null;
         this.audioSourceNode = null;
         this.audioProcessorNode = null;
+        this.audioMonitorNode = null;
         this.audioChunks = [];
         this.audioSampleRate = 16000;
         this.recordingStartedAt = null;
@@ -45,6 +46,7 @@ class StreamVoiceEnhanced {
         if (!this.hasDesktopBridge) {
             this.connectWebSocket();
         }
+        this.loadAppVersion();
         this.startStatusPolling();
         this.setupSpeechRecognition();
         this.setupEventListeners();
@@ -58,6 +60,24 @@ class StreamVoiceEnhanced {
         }
 
         return 'http://127.0.0.1:3030';
+    }
+
+    async loadAppVersion() {
+        const version = await window.electronAPI?.getVersion?.().catch(() => null);
+        if (!version) {
+            return;
+        }
+
+        const appVersion = document.getElementById('app-version');
+        const footerVersion = document.getElementById('footer-version');
+
+        if (appVersion) {
+            appVersion.textContent = version;
+        }
+
+        if (footerVersion) {
+            footerVersion.textContent = `v${version}`;
+        }
     }
 
     connectWebSocket() {
@@ -342,7 +362,22 @@ class StreamVoiceEnhanced {
     }
 
     startListening() {
-        if (!this.isListening && this.recognition) {
+        if (!this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStartPushToTalk) {
+            this.isListening = true;
+            this.voiceButton.classList.add('listening');
+            this.voiceFeedback.classList.remove('hidden');
+            this.transcript.textContent = 'Listening...';
+            this.transcript.style.color = '#95a5a6';
+            this.result.textContent = '';
+            this.beginDesktopRecording().catch((error) => {
+                this.result.textContent = `Speech capture error: ${error.message}`;
+                this.result.style.color = '#e74c3c';
+                this.stopListening();
+            });
+            window.electronAPI.speechStartPushToTalk().catch((error) => {
+                this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
+            });
+        } else if (!this.isListening && this.recognition) {
             this.isListening = true;
             this.voiceButton.classList.add('listening');
             this.voiceFeedback.classList.remove('hidden');
@@ -356,30 +391,11 @@ class StreamVoiceEnhanced {
                 console.error('Failed to start recognition:', error);
                 this.stopListening();
             }
-        } else if (!this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStartPushToTalk) {
-            this.isListening = true;
-            this.voiceButton.classList.add('listening');
-            this.voiceFeedback.classList.remove('hidden');
-            this.transcript.textContent = 'Listening...';
-            this.transcript.style.color = '#95a5a6';
-            this.result.textContent = '';
-            this.beginDesktopRecording();
-            window.electronAPI.speechStartPushToTalk().catch((error) => {
-                this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
-            });
         }
     }
 
     stopListening() {
-        if (this.isListening) {
-            this.isListening = false;
-            this.voiceButton.classList.remove('listening');
-            this.voiceFeedback.classList.add('hidden');
-
-            if (this.recognition) {
-                this.recognition.stop();
-            }
-        } else if (this.hasDesktopBridge && window.electronAPI?.speechStopPushToTalk) {
+        if (this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStopPushToTalk) {
             this.isListening = false;
             this.voiceButton.classList.remove('listening');
             this.voiceFeedback.classList.add('hidden');
@@ -388,7 +404,18 @@ class StreamVoiceEnhanced {
             window.electronAPI.speechStopPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
-            this.finishDesktopRecording();
+            this.finishDesktopRecording().catch((error) => {
+                this.result.textContent = `Speech capture error: ${error.message}`;
+                this.result.style.color = '#e74c3c';
+            });
+        } else if (this.isListening) {
+            this.isListening = false;
+            this.voiceButton.classList.remove('listening');
+            this.voiceFeedback.classList.add('hidden');
+
+            if (this.recognition) {
+                this.recognition.stop();
+            }
         }
     }
 
@@ -398,23 +425,48 @@ class StreamVoiceEnhanced {
             return;
         }
 
+        if (this.audioContext) {
+            return;
+        }
+
         try {
             this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             this.audioChunks = [];
             this.recordingStartedAt = Date.now();
-            this.audioContext = new AudioContextClass({ sampleRate: 16000 });
+            try {
+                this.audioContext = new AudioContextClass({ sampleRate: 16000 });
+            } catch (_error) {
+                this.audioContext = new AudioContextClass();
+            }
             this.audioSampleRate = this.audioContext.sampleRate;
             this.audioSourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+            if (typeof this.audioContext.createScriptProcessor !== 'function') {
+                throw new Error('Audio capture is not supported in this build');
+            }
             this.audioProcessorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+            this.audioMonitorNode = this.audioContext.createGain();
+            this.audioMonitorNode.gain.value = 0;
             this.audioProcessorNode.onaudioprocess = (event) => {
                 const channel = event.inputBuffer.getChannelData(0);
                 this.audioChunks.push(new Float32Array(channel));
             };
             this.audioSourceNode.connect(this.audioProcessorNode);
-            this.audioProcessorNode.connect(this.audioContext.destination);
+            this.audioProcessorNode.connect(this.audioMonitorNode);
+            this.audioMonitorNode.connect(this.audioContext.destination);
         } catch (error) {
+            this.audioMonitorNode?.disconnect();
+            this.audioProcessorNode?.disconnect();
+            this.audioSourceNode?.disconnect();
+            this.mediaStream?.getTracks().forEach((track) => track.stop());
+            this.audioContext?.close?.().catch(() => {});
+            this.mediaStream = null;
+            this.audioContext = null;
+            this.audioSourceNode = null;
+            this.audioProcessorNode = null;
+            this.audioMonitorNode = null;
             this.result.textContent = `Speech capture error: ${error.message}`;
             this.result.style.color = '#e74c3c';
+            throw error;
         }
     }
 
@@ -428,17 +480,20 @@ class StreamVoiceEnhanced {
         const context = this.audioContext;
         const sourceNode = this.audioSourceNode;
         const processorNode = this.audioProcessorNode;
+        const monitorNode = this.audioMonitorNode;
         const chunks = this.audioChunks.slice();
 
         this.mediaStream = null;
         this.audioContext = null;
         this.audioSourceNode = null;
         this.audioProcessorNode = null;
+        this.audioMonitorNode = null;
         this.recordingStartedAt = null;
         this.audioChunks = [];
 
         processorNode?.disconnect();
         sourceNode?.disconnect();
+        monitorNode?.disconnect();
         stream?.getTracks().forEach((track) => track.stop());
         await context.close().catch(() => {});
 
