@@ -26,6 +26,7 @@ class StreamVoiceEnhanced {
         this.voiceButton = document.getElementById('voice-button');
         this.voiceFeedback = document.getElementById('voice-feedback');
         this.transcript = document.getElementById('transcript');
+        this.heardCommand = document.getElementById('heard-command');
         this.result = document.getElementById('result');
         this.historyList = document.getElementById('history-list');
         this.commandCategories = document.getElementById('command-categories');
@@ -361,6 +362,10 @@ class StreamVoiceEnhanced {
             this.voiceFeedback.classList.remove('hidden');
             this.transcript.textContent = 'Listening...';
             this.transcript.style.color = '#95a5a6';
+            if (this.heardCommand) {
+                this.heardCommand.textContent = 'Heard: listening...';
+                this.heardCommand.style.color = '#8ab4ff';
+            }
             this.result.textContent = '';
             window.electronAPI.speechStartPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
@@ -371,6 +376,10 @@ class StreamVoiceEnhanced {
             this.voiceFeedback.classList.remove('hidden');
             this.transcript.textContent = 'Listening...';
             this.transcript.style.color = '#95a5a6';
+            if (this.heardCommand) {
+                this.heardCommand.textContent = 'Heard: listening...';
+                this.heardCommand.style.color = '#8ab4ff';
+            }
             this.result.textContent = '';
 
             try {
@@ -389,6 +398,10 @@ class StreamVoiceEnhanced {
             this.voiceFeedback.classList.add('hidden');
             this.transcript.textContent = 'Transcribing...';
             this.transcript.style.color = '#95a5a6';
+            if (this.heardCommand) {
+                this.heardCommand.textContent = 'Heard: processing your phrase...';
+                this.heardCommand.style.color = '#8ab4ff';
+            }
             window.electronAPI.speechStopPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
@@ -414,9 +427,17 @@ class StreamVoiceEnhanced {
             if (state.status === 'recording') {
                 this.transcript.textContent = 'Listening...';
                 this.transcript.style.color = '#95a5a6';
+                if (this.heardCommand) {
+                    this.heardCommand.textContent = 'Heard: listening...';
+                    this.heardCommand.style.color = '#8ab4ff';
+                }
             } else if (state.status === 'transcribing') {
                 this.transcript.textContent = 'Transcribing...';
                 this.transcript.style.color = '#95a5a6';
+                if (this.heardCommand) {
+                    this.heardCommand.textContent = 'Heard: processing your phrase...';
+                    this.heardCommand.style.color = '#8ab4ff';
+                }
                 if (state.lastAudioPath) {
                     this.result.textContent = `Captured ${Math.round((state.lastAudioDurationMs || 0) / 1000)}s of audio for Whisper`;
                     this.result.style.color = '#f39c12';
@@ -424,6 +445,10 @@ class StreamVoiceEnhanced {
             } else if (state.status === 'ready' && state.transcript) {
                 this.transcript.textContent = `Recognized: "${state.transcript}"`;
                 this.transcript.style.color = '#2ecc71';
+                if (this.heardCommand) {
+                    this.heardCommand.textContent = `Heard: "${state.transcript}"`;
+                    this.heardCommand.style.color = '#8ab4ff';
+                }
                 if (state.lastCommandMessage) {
                     this.result.textContent = state.lastCommandMessage;
                     this.result.style.color = state.lastCommandStatus === 'error' ? '#e74c3c' : '#2ecc71';
@@ -432,6 +457,10 @@ class StreamVoiceEnhanced {
                     this.result.style.color = '#2ecc71';
                 }
             } else if (state.status === 'error') {
+                if (this.heardCommand && state.transcript) {
+                    this.heardCommand.textContent = `Heard: "${state.transcript}"`;
+                    this.heardCommand.style.color = '#8ab4ff';
+                }
                 this.result.textContent = `Speech error: ${state.lastError}`;
                 this.result.style.color = '#e74c3c';
             }
