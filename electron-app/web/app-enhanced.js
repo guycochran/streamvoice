@@ -12,10 +12,6 @@ class StreamVoiceEnhanced {
         this.speechState = null;
         this.currentMicLevel = 0;
         this.voiceInputMode = 'push_to_talk';
-        this.rendererSpeechStream = null;
-        this.rendererMediaRecorder = null;
-        this.rendererRecordedChunks = [];
-        this.rendererRecordingStartedAt = null;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -453,250 +449,6 @@ class StreamVoiceEnhanced {
         }
     }
 
-    getPreferredMicDeviceId() {
-        return this.speechState?.selectedMicDeviceId || '';
-    }
-
-    getCaptureConstraints() {
-        const deviceId = this.getPreferredMicDeviceId();
-        return {
-            audio: {
-                deviceId: deviceId ? { exact: deviceId } : undefined,
-                channelCount: 1,
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            }
-        };
-    }
-
-    async ensureRendererSpeechStream() {
-        const preferredDeviceId = this.getPreferredMicDeviceId();
-        const currentTrack = this.rendererSpeechStream?.getAudioTracks?.()[0];
-        const currentDeviceId = currentTrack?.getSettings?.().deviceId || '';
-
-        if (this.rendererSpeechStream && ((!preferredDeviceId && !currentDeviceId) || preferredDeviceId === currentDeviceId)) {
-            return this.rendererSpeechStream;
-        }
-
-        if (this.rendererSpeechStream) {
-            this.rendererSpeechStream.getTracks().forEach((track) => track.stop());
-            this.rendererSpeechStream = null;
-        }
-
-        this.rendererSpeechStream = await navigator.mediaDevices.getUserMedia(this.getCaptureConstraints());
-        return this.rendererSpeechStream;
-    }
-
-    getRecorderMimeType() {
-        if (window.MediaRecorder?.isTypeSupported?.('audio/webm;codecs=opus')) {
-            return 'audio/webm;codecs=opus';
-        }
-
-        if (window.MediaRecorder?.isTypeSupported?.('audio/webm')) {
-            return 'audio/webm';
-        }
-
-        return '';
-    }
-
-    encodeWavFromAudioBuffer(audioBuffer) {
-        const sampleRate = 16000;
-        const offlineContext = new OfflineAudioContext(1, Math.ceil(audioBuffer.duration * sampleRate), sampleRate);
-        const source = offlineContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(offlineContext.destination);
-        source.start(0);
-
-        return offlineContext.startRendering().then((renderedBuffer) => {
-            const samples = renderedBuffer.getChannelData(0);
-            const bytesPerSample = 2;
-            const dataSize = samples.length * bytesPerSample;
-            const buffer = new ArrayBuffer(44 + dataSize);
-            const view = new DataView(buffer);
-
-            const writeString = (offset, text) => {
-                for (let i = 0; i < text.length; i += 1) {
-                    view.setUint8(offset + i, text.charCodeAt(i));
-                }
-            };
-
-            writeString(0, 'RIFF');
-            view.setUint32(4, 36 + dataSize, true);
-            writeString(8, 'WAVE');
-            writeString(12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * bytesPerSample, true);
-            view.setUint16(32, bytesPerSample, true);
-            view.setUint16(34, 16, true);
-            writeString(36, 'data');
-            view.setUint32(40, dataSize, true);
-
-            let offset = 44;
-            for (let i = 0; i < samples.length; i += 1) {
-                const sample = Math.max(-1, Math.min(1, samples[i]));
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-                offset += 2;
-            }
-
-            return new Uint8Array(buffer);
-        });
-    }
-
-    async decodeChunksToWav(chunks, mimeType) {
-        const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
-        const audioBuffer = await blob.arrayBuffer();
-        const audioContext = new AudioContext();
-
-        try {
-            const decoded = await audioContext.decodeAudioData(audioBuffer.slice(0));
-            return await this.encodeWavFromAudioBuffer(decoded);
-        } finally {
-            await audioContext.close();
-        }
-    }
-
-    async startDesktopSpeechCapture() {
-        const stream = await this.ensureRendererSpeechStream();
-        const mimeType = this.getRecorderMimeType();
-        const options = mimeType ? { mimeType } : undefined;
-
-        this.rendererRecordedChunks = [];
-        this.rendererRecordingStartedAt = Date.now();
-
-        await new Promise((resolve, reject) => {
-            try {
-                this.rendererMediaRecorder = new MediaRecorder(stream, options);
-            } catch (error) {
-                reject(error);
-                return;
-            }
-
-            this.rendererMediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    this.rendererRecordedChunks.push(event.data);
-                    window.electronAPI?.speechReportLifecycle?.({
-                        capturePhase: 'chunk_captured',
-                        lastCaptureChunkCount: this.rendererRecordedChunks.length,
-                        lastAudioBytes: this.rendererRecordedChunks.reduce((sum, chunk) => sum + chunk.size, 0),
-                        lastAudioMimeType: this.rendererMediaRecorder?.mimeType || mimeType || 'audio/webm'
-                    });
-                }
-            };
-
-            this.rendererMediaRecorder.onerror = (event) => {
-                reject(event?.error || new Error('MediaRecorder error'));
-            };
-
-            this.rendererMediaRecorder.onstart = () => {
-                window.electronAPI?.speechReportLifecycle?.({
-                    capturePhase: 'recording',
-                    lastCaptureChunkCount: 0,
-                    lastAudioBytes: 0,
-                    lastAudioMimeType: this.rendererMediaRecorder?.mimeType || mimeType || 'audio/webm'
-                });
-                resolve();
-            };
-
-            this.rendererMediaRecorder.start(250);
-        });
-    }
-
-    async stopDesktopSpeechCapture() {
-        const recorder = this.rendererMediaRecorder;
-        if (!recorder) {
-            return;
-        }
-
-        this.rendererMediaRecorder = null;
-        window.electronAPI?.speechReportLifecycle?.({
-            capturePhase: 'stop_requested',
-            lastCaptureChunkCount: this.rendererRecordedChunks.length
-        });
-
-        await new Promise((resolve) => {
-            let settled = false;
-            const finish = () => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                resolve();
-            };
-
-            recorder.onstop = () => {
-                window.electronAPI?.speechReportLifecycle?.({
-                    capturePhase: 'stop_event',
-                    lastCaptureChunkCount: this.rendererRecordedChunks.length
-                });
-                finish();
-            };
-
-            recorder.onerror = (event) => {
-                window.electronAPI?.speechReportLifecycle?.({
-                    capturePhase: 'stop_error',
-                    lastError: event?.error?.message || 'MediaRecorder stop error'
-                });
-                finish();
-            };
-
-            setTimeout(() => {
-                window.electronAPI?.speechReportLifecycle?.({
-                    capturePhase: 'stop_timeout',
-                    lastCaptureChunkCount: this.rendererRecordedChunks.length
-                });
-                finish();
-            }, 1500);
-
-            try {
-                if (typeof recorder.requestData === 'function' && recorder.state === 'recording') {
-                    recorder.requestData();
-                }
-            } catch (_error) {
-                // Best effort only.
-            }
-
-            try {
-                recorder.stop();
-            } catch (_error) {
-                finish();
-            }
-        });
-
-        if (!this.rendererRecordedChunks.length) {
-            throw new Error('No audio chunks were captured. Try holding the mic button slightly longer.');
-        }
-
-        const wavBytes = await this.decodeChunksToWav(
-            this.rendererRecordedChunks,
-            recorder.mimeType || 'audio/webm'
-        );
-        const durationMs = Date.now() - (this.rendererRecordingStartedAt || Date.now());
-        this.rendererRecordedChunks = [];
-        this.rendererRecordingStartedAt = null;
-
-        await window.electronAPI?.speechStopPushToTalk?.();
-        window.electronAPI?.speechReportLifecycle?.({
-            capturePhase: 'final_submit_ready',
-            lastCaptureChunkCount: 0,
-            lastAudioBytes: wavBytes.length,
-            lastAudioMimeType: 'audio/wav'
-        });
-
-        const submitResult = await window.electronAPI?.speechSubmitAudio?.({
-            audioBytes: Array.from(wavBytes),
-            mimeType: 'audio/wav',
-            durationMs
-        });
-
-        if (!submitResult?.success) {
-            throw new Error(submitResult?.error || 'Audio submission failed');
-        }
-    }
-
     startListening() {
         if (!this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStartPushToTalk) {
             this.isListening = true;
@@ -709,10 +461,7 @@ class StreamVoiceEnhanced {
                 this.heardCommand.style.color = '#8ab4ff';
             }
             this.result.textContent = '';
-            window.electronAPI.speechStartPushToTalk().then(() => {
-                return this.startDesktopSpeechCapture();
-            }).catch((error) => {
-                window.electronAPI?.speechReportError?.(error.message || String(error));
+            window.electronAPI.speechStartPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
         } else if (!this.isListening && this.recognition) {
@@ -747,8 +496,7 @@ class StreamVoiceEnhanced {
                 this.heardCommand.textContent = 'Heard: processing your phrase...';
                 this.heardCommand.style.color = '#8ab4ff';
             }
-            this.stopDesktopSpeechCapture().catch((error) => {
-                window.electronAPI?.speechReportError?.(error.message || String(error));
+            window.electronAPI.speechStopPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
         } else if (this.isListening) {
