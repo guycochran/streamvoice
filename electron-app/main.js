@@ -715,9 +715,7 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
   const initialFilePath = await persistSpeechCapture(audioBytes, {
     mimeType: payload.mimeType
   });
-  const filePath = (appSettings.speechCommandModel || 'tiny.en') === 'tiny.en' && (payload.mimeType || '').includes('wav')
-    ? await trimSilenceFromWav(initialFilePath)
-    : initialFilePath;
+  const filePath = initialFilePath;
   speechService.completeCapture({
     filePath,
     durationMs: payload.durationMs,
@@ -773,9 +771,7 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
 
 async function processSpeechAudioFile(filePath, payload = {}) {
   latestSpeechPreviewSequence = 0;
-  const processedFilePath = (appSettings.speechCommandModel || 'tiny.en') === 'tiny.en' && (payload.mimeType || 'audio/wav').includes('wav')
-    ? await trimSilenceFromWav(filePath)
-    : filePath;
+  const processedFilePath = filePath;
   const fileStats = await fs.promises.stat(processedFilePath);
 
   speechService.completeCapture({
