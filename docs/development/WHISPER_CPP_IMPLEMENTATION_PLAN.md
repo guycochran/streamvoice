@@ -38,6 +38,10 @@ Replace Chromium Web Speech with a desktop-native speech pipeline based on `whis
   - transcribing
   - error
 
+Status:
+- `1.1.0-alpha.6` added the speech service contract.
+- Next alpha adds utterance capture and temp-file handoff from renderer to Electron main.
+
 ### Stage 3
 
 - Integrate `whisper.cpp`.

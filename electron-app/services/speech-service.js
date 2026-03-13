@@ -14,7 +14,9 @@ class SpeechService extends EventEmitter {
       model: 'base.en',
       modelStatus: 'not_installed',
       transcript: '',
-      lastError: null
+      lastError: null,
+      lastAudioPath: null,
+      lastAudioDurationMs: 0
     };
   }
 
@@ -73,6 +75,17 @@ class SpeechService extends EventEmitter {
       transcribing: false,
       status: 'error',
       lastError: error instanceof Error ? error.message : String(error || 'Unknown speech error')
+    });
+  }
+
+  completeCapture(details = {}) {
+    return this.setState({
+      recording: false,
+      transcribing: true,
+      status: 'transcribing',
+      lastAudioPath: details.filePath || null,
+      lastAudioDurationMs: details.durationMs || 0,
+      lastError: null
     });
   }
 }

@@ -10,6 +10,10 @@ class StreamVoiceEnhanced {
         this.apiBaseUrl = this.detectApiBaseUrl();
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
+        this.mediaRecorder = null;
+        this.mediaStream = null;
+        this.recordedChunks = [];
+        this.recordingStartedAt = null;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -353,6 +357,7 @@ class StreamVoiceEnhanced {
             this.transcript.textContent = 'Listening...';
             this.transcript.style.color = '#95a5a6';
             this.result.textContent = '';
+            this.beginDesktopRecording();
             window.electronAPI.speechStartPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
@@ -377,6 +382,67 @@ class StreamVoiceEnhanced {
             window.electronAPI.speechStopPushToTalk().catch((error) => {
                 this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
+            this.finishDesktopRecording();
+        }
+    }
+
+    async beginDesktopRecording() {
+        if (!this.hasDesktopBridge || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+            return;
+        }
+
+        try {
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.recordedChunks = [];
+            this.recordingStartedAt = Date.now();
+            this.mediaRecorder = new MediaRecorder(this.mediaStream, { mimeType: 'audio/webm' });
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    this.recordedChunks.push(event.data);
+                }
+            };
+            this.mediaRecorder.start();
+        } catch (error) {
+            this.result.textContent = `Speech capture error: ${error.message}`;
+            this.result.style.color = '#e74c3c';
+        }
+    }
+
+    async finishDesktopRecording() {
+        if (!this.mediaRecorder) {
+            return;
+        }
+
+        const recorder = this.mediaRecorder;
+        const stream = this.mediaStream;
+        const startedAt = this.recordingStartedAt || Date.now();
+
+        this.mediaRecorder = null;
+        this.mediaStream = null;
+        this.recordingStartedAt = null;
+
+        await new Promise((resolve) => {
+            recorder.onstop = resolve;
+            recorder.stop();
+        });
+
+        const blob = new Blob(this.recordedChunks, { type: recorder.mimeType || 'audio/webm' });
+        const arrayBuffer = await blob.arrayBuffer();
+        this.recordedChunks = [];
+
+        stream?.getTracks().forEach((track) => track.stop());
+
+        if (window.electronAPI?.speechSubmitAudio) {
+            const response = await window.electronAPI.speechSubmitAudio({
+                audioBytes: Array.from(new Uint8Array(arrayBuffer)),
+                mimeType: blob.type || 'audio/webm',
+                durationMs: Date.now() - startedAt
+            });
+
+            if (!response.success) {
+                this.result.textContent = `Speech capture error: ${response.error}`;
+                this.result.style.color = '#e74c3c';
+            }
         }
     }
 
@@ -393,6 +459,10 @@ class StreamVoiceEnhanced {
             } else if (state.status === 'transcribing') {
                 this.transcript.textContent = 'Transcribing...';
                 this.transcript.style.color = '#95a5a6';
+                if (state.lastAudioPath) {
+                    this.result.textContent = `Captured audio ready for Whisper (${Math.round((state.lastAudioDurationMs || 0) / 1000)}s)`;
+                    this.result.style.color = '#f39c12';
+                }
             } else if (state.status === 'error') {
                 this.result.textContent = `Speech error: ${state.lastError}`;
                 this.result.style.color = '#e74c3c';

@@ -12,6 +12,7 @@ let tray;
 let serverProcess;
 let obsSettingsFilePath;
 let backendLogFilePath;
+let speechCaptureDirPath;
 let desktopObsReconnectTimer = null;
 const speechService = new SpeechService();
 const LOCAL_API_PORT = '3030';
@@ -231,7 +232,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.6',
+          message: 'StreamVoice v1.1.0-alpha.7',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -327,6 +328,24 @@ function appendBackendLog(message) {
 
   const line = `[${new Date().toISOString()}] ${message.endsWith('\n') ? message : `${message}\n`}`;
   fs.appendFile(backendLogFilePath, line, () => {});
+}
+
+function ensureSpeechCaptureDir() {
+  if (!speechCaptureDirPath) {
+    speechCaptureDirPath = path.join(app.getPath('userData'), 'speech-captures');
+  }
+
+  fs.mkdirSync(speechCaptureDirPath, { recursive: true });
+  return speechCaptureDirPath;
+}
+
+async function persistSpeechCapture(audioBytes, metadata = {}) {
+  const captureDir = ensureSpeechCaptureDir();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const extension = metadata.mimeType === 'audio/webm' ? 'webm' : 'bin';
+  const filePath = path.join(captureDir, `utterance-${timestamp}.${extension}`);
+  await fs.promises.writeFile(filePath, Buffer.from(audioBytes));
+  return filePath;
 }
 
 function loadDesktopObsSettings() {
@@ -859,6 +878,7 @@ autoUpdater.on('update-downloaded', () => {
 app.whenReady().then(() => {
   obsSettingsFilePath = path.join(app.getPath('userData'), 'obs-settings.json');
   backendLogFilePath = path.join(app.getPath('userData'), 'backend.log');
+  speechCaptureDirPath = path.join(app.getPath('userData'), 'speech-captures');
   fs.writeFileSync(backendLogFilePath, '', { flag: 'a' });
   loadDesktopObsSettings();
   speechService.initialize();
@@ -1015,6 +1035,32 @@ ipcMain.handle('speech-stop-push-to-talk', () => {
   const state = speechService.stopPushToTalk();
   broadcastSpeechState();
   return state;
+});
+
+ipcMain.handle('speech-submit-audio', async (_event, payload) => {
+  try {
+    const filePath = await persistSpeechCapture(payload.audioBytes, {
+      mimeType: payload.mimeType
+    });
+    const state = speechService.completeCapture({
+      filePath,
+      durationMs: payload.durationMs
+    });
+    broadcastSpeechState();
+    return {
+      success: true,
+      filePath,
+      state
+    };
+  } catch (error) {
+    const state = speechService.fail(error);
+    broadcastSpeechState();
+    return {
+      success: false,
+      error: error.message,
+      state
+    };
+  }
 });
 
 speechService.on('state-changed', () => {
