@@ -1168,6 +1168,15 @@ function normalizeDesktopName(value) {
     .replace(/[^a-z0-9]/g, '');
 }
 
+function tokenizeDesktopName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 function resolveMappedScene(targetScene) {
   const mappingKey = normalizeDesktopName(targetScene);
   return appSettings.sceneMappings?.[mappingKey] || targetScene;
@@ -1176,17 +1185,60 @@ function resolveMappedScene(targetScene) {
 function getSceneAliases(targetScene) {
   const key = normalizeDesktopName(targetScene);
   const aliasMap = {
-    starting: ['starting', 'start', 'starting soon', 'stream starting', 'intro'],
-    ending: ['ending', 'end', 'stream ending', 'outro', 'goodbye'],
+    starting: ['starting', 'start', 'start scene', 'starting soon', 'stream starting', 'intro', 'intro scene', 'opening'],
+    ending: ['ending', 'end', 'end scene', 'stream ending', 'outro', 'goodbye', 'closing'],
     brb: ['brb', 'break', 'be right back', 'intermission'],
     raid: ['raid', 'raid mode'],
-    gameplay: ['gameplay', 'game', 'gaming'],
+    gameplay: ['gameplay', 'game', 'gaming', 'play', 'main gameplay'],
     chatting: ['chatting', 'just chatting', 'chat'],
     camera: ['camera', 'cam'],
-    desktop: ['desktop', 'screen']
+    desktop: ['desktop', 'screen', 'screen share']
   };
 
   return aliasMap[key] || [targetScene];
+}
+
+function findBestSceneMatch(scenes, targetScene) {
+  const aliases = getSceneAliases(targetScene);
+  const normalizedAliases = aliases.map(normalizeDesktopName).filter(Boolean);
+  const aliasTokenSets = aliases.map(tokenizeDesktopName).filter((tokens) => tokens.length > 0);
+  let bestMatch = null;
+
+  scenes.forEach((scene) => {
+    const normalizedScene = normalizeDesktopName(scene);
+    const sceneTokens = tokenizeDesktopName(scene);
+    let score = 0;
+
+    normalizedAliases.forEach((alias) => {
+      if (!alias) {
+        return;
+      }
+
+      if (normalizedScene === alias) {
+        score = Math.max(score, 100);
+      } else if (normalizedScene.startsWith(alias)) {
+        score = Math.max(score, 90);
+      } else if (normalizedScene.includes(alias)) {
+        score = Math.max(score, 80);
+      } else if (alias.includes(normalizedScene)) {
+        score = Math.max(score, 70);
+      }
+    });
+
+    aliasTokenSets.forEach((aliasTokens) => {
+      const overlap = aliasTokens.filter((token) => sceneTokens.includes(token)).length;
+      if (overlap > 0) {
+        const tokenScore = 40 + (overlap * 10);
+        score = Math.max(score, tokenScore);
+      }
+    });
+
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { scene, score };
+    }
+  });
+
+  return bestMatch && bestMatch.score >= 40 ? bestMatch.scene : null;
 }
 
 async function findDesktopInput(target) {
@@ -1201,15 +1253,7 @@ async function desktopSwitchToScene(targetScene) {
 
   const { scenes } = await getDesktopSceneState();
   const requestedTarget = resolveMappedScene(targetScene);
-  const aliases = getSceneAliases(requestedTarget).map(normalizeDesktopName);
-  const sceneName = scenes.find((scene) => {
-    const normalizedScene = normalizeDesktopName(scene);
-    return aliases.some((alias) =>
-      normalizedScene === alias ||
-      normalizedScene.includes(alias) ||
-      alias.includes(normalizedScene)
-    );
-  });
+  const sceneName = findBestSceneMatch(scenes, requestedTarget);
 
   if (!sceneName) {
     throw new Error(`Scene "${requestedTarget}" not found`);
