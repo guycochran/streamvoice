@@ -91,7 +91,11 @@ async function buildWhisperCli() {
   await fsp.rm(buildDir, { recursive: true, force: true });
 
   console.log('Configuring whisper.cpp build...');
-  await run('cmake', ['-S', extractedDir, '-B', buildDir, '-DCMAKE_BUILD_TYPE=Release']);
+  const cmakeArgs = ['-S', extractedDir, '-B', buildDir, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF'];
+  if (process.platform === 'win32') {
+    cmakeArgs.push('-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded');
+  }
+  await run('cmake', cmakeArgs);
 
   console.log('Building whisper-cli...');
   await run('cmake', ['--build', buildDir, '--config', 'Release', '--target', 'whisper-cli']);
@@ -110,6 +114,14 @@ async function buildWhisperCli() {
 
   await ensureDir(vendorRoot);
   await fsp.copyFile(builtBinaryPath, vendorBinaryPath);
+  const builtBinaryDir = path.dirname(builtBinaryPath);
+  const builtArtifacts = await fsp.readdir(builtBinaryDir);
+  for (const fileName of builtArtifacts) {
+    if (!fileName.toLowerCase().endsWith('.dll')) {
+      continue;
+    }
+    await fsp.copyFile(path.join(builtBinaryDir, fileName), path.join(vendorRoot, fileName));
+  }
   if (process.platform !== 'win32') {
     await fsp.chmod(vendorBinaryPath, 0o755);
   }

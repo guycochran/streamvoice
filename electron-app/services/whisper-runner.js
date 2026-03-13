@@ -6,6 +6,14 @@ function fileExists(filePath) {
   return Boolean(filePath) && fs.existsSync(filePath);
 }
 
+function formatWhisperExit(code, stderr) {
+  if (code === 3221225781) {
+    return 'Whisper failed to start because a required Windows DLL/runtime is missing.';
+  }
+
+  return stderr.trim() || `Whisper exited with code ${code}`;
+}
+
 function resolveWhisperConfig({ appRoot, userDataPath }) {
   const candidateBins = [
     process.env.STREAMVOICE_WHISPER_BIN,
@@ -66,7 +74,7 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath }) {
 
     child.on('exit', (code) => {
       if (code !== 0) {
-        reject(new Error(stderr.trim() || `Whisper exited with code ${code}`));
+        reject(new Error(formatWhisperExit(code, stderr)));
         return;
       }
 
