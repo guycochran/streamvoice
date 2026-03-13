@@ -15,9 +15,11 @@ class StreamVoiceEnhanced {
         this.audioSourceNode = null;
         this.audioProcessorNode = null;
         this.audioMonitorNode = null;
+        this.audioCaptureDestination = null;
         this.audioChunks = [];
         this.audioSampleRate = 16000;
         this.recordingStartedAt = null;
+        this.desktopRecordingActive = false;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -401,12 +403,12 @@ class StreamVoiceEnhanced {
             this.voiceFeedback.classList.add('hidden');
             this.transcript.textContent = 'Transcribing...';
             this.transcript.style.color = '#95a5a6';
-            window.electronAPI.speechStopPushToTalk().catch((error) => {
-                this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
-            });
             this.finishDesktopRecording().catch((error) => {
                 this.result.textContent = `Speech capture error: ${error.message}`;
                 this.result.style.color = '#e74c3c';
+            });
+            window.electronAPI.speechStopPushToTalk().catch((error) => {
+                this.handleCommandError(error, { source: 'voice', command: 'push-to-talk' });
             });
         } else if (this.isListening) {
             this.isListening = false;
@@ -425,7 +427,7 @@ class StreamVoiceEnhanced {
             return;
         }
 
-        if (this.audioContext) {
+        if (this.audioContext || this.desktopRecordingActive) {
             return;
         }
 
@@ -446,17 +448,20 @@ class StreamVoiceEnhanced {
             this.audioProcessorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
             this.audioMonitorNode = this.audioContext.createGain();
             this.audioMonitorNode.gain.value = 0;
+            this.audioCaptureDestination = this.audioContext.createMediaStreamDestination();
             this.audioProcessorNode.onaudioprocess = (event) => {
                 const channel = event.inputBuffer.getChannelData(0);
                 this.audioChunks.push(new Float32Array(channel));
             };
             this.audioSourceNode.connect(this.audioProcessorNode);
             this.audioProcessorNode.connect(this.audioMonitorNode);
-            this.audioMonitorNode.connect(this.audioContext.destination);
+            this.audioMonitorNode.connect(this.audioCaptureDestination);
+            this.desktopRecordingActive = true;
         } catch (error) {
             this.audioMonitorNode?.disconnect();
             this.audioProcessorNode?.disconnect();
             this.audioSourceNode?.disconnect();
+            this.audioCaptureDestination?.disconnect?.();
             this.mediaStream?.getTracks().forEach((track) => track.stop());
             this.audioContext?.close?.().catch(() => {});
             this.mediaStream = null;
@@ -464,6 +469,8 @@ class StreamVoiceEnhanced {
             this.audioSourceNode = null;
             this.audioProcessorNode = null;
             this.audioMonitorNode = null;
+            this.audioCaptureDestination = null;
+            this.desktopRecordingActive = false;
             this.result.textContent = `Speech capture error: ${error.message}`;
             this.result.style.color = '#e74c3c';
             throw error;
@@ -471,9 +478,11 @@ class StreamVoiceEnhanced {
     }
 
     async finishDesktopRecording() {
-        if (!this.audioContext) {
+        if (!this.audioContext || !this.desktopRecordingActive) {
             return;
         }
+
+        this.desktopRecordingActive = false;
 
         const stream = this.mediaStream;
         const startedAt = this.recordingStartedAt || Date.now();
@@ -481,6 +490,7 @@ class StreamVoiceEnhanced {
         const sourceNode = this.audioSourceNode;
         const processorNode = this.audioProcessorNode;
         const monitorNode = this.audioMonitorNode;
+        const captureDestination = this.audioCaptureDestination;
         const chunks = this.audioChunks.slice();
 
         this.mediaStream = null;
@@ -488,12 +498,14 @@ class StreamVoiceEnhanced {
         this.audioSourceNode = null;
         this.audioProcessorNode = null;
         this.audioMonitorNode = null;
+        this.audioCaptureDestination = null;
         this.recordingStartedAt = null;
         this.audioChunks = [];
 
         processorNode?.disconnect();
         sourceNode?.disconnect();
         monitorNode?.disconnect();
+        captureDestination?.disconnect?.();
         stream?.getTracks().forEach((track) => track.stop());
         await context.close().catch(() => {});
 
