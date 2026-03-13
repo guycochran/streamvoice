@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.3',
+          message: 'StreamVoice v1.1.0-beta.4',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -850,10 +850,10 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('emergency mute')) return 'emergency mute';
   if (includesPhrase('subscriber celebration')) return 'subscriber celebration';
   if (includesPhrase('raid mode')) return 'raid mode';
-  if (includesPhrase('start streaming') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
-  if (includesPhrase('stop streaming') || includesPhrase('stop stream') || includesPhrase('end stream')) return 'stop stream';
-  if (includesPhrase('start recording') || includesPhrase('record')) return 'record';
-  if (includesPhrase('stop recording') || includesPhrase('end recording')) return 'stop recording';
+  if (includesPhrase('start streaming') || includesPhrase('start the stream') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
+  if (includesPhrase('stop streaming') || includesPhrase('stop the stream') || includesPhrase('stop stream') || includesPhrase('end the stream') || includesPhrase('end stream')) return 'stop stream';
+  if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) return 'record';
+  if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('end recording')) return 'stop recording';
   if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
   if (includesPhrase('unmute microphone') || includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
   if (includesPhrase('mute microphone') || includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
