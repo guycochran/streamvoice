@@ -29,6 +29,8 @@ class SpeechService extends EventEmitter {
       lastAudioDurationMs: 0,
       lastAudioBytes: 0,
       lastAudioMimeType: null,
+      capturePhase: 'idle',
+      lastCaptureChunkCount: 0,
       lastWhisperDurationMs: null,
       lastWhisperStdout: '',
       lastWhisperStderr: '',
@@ -71,6 +73,7 @@ class SpeechService extends EventEmitter {
       recording: true,
       transcribing: false,
       status: 'recording',
+      capturePhase: 'starting',
       transcript: '',
       partialTranscript: '',
       lastCommand: null,
@@ -129,6 +132,7 @@ class SpeechService extends EventEmitter {
       recording: false,
       transcribing: true,
       status: 'transcribing',
+      capturePhase: 'submitted',
       lastAudioPath: details.filePath || null,
       lastAudioDurationMs: details.durationMs || 0,
       lastAudioBytes: details.audioBytes || this.state.lastAudioBytes,
@@ -168,6 +172,10 @@ class SpeechService extends EventEmitter {
       inputLevel: typeof details.inputLevel === 'number' ? details.inputLevel : this.state.inputLevel,
       selectedMicDeviceId: details.selectedMicDeviceId ?? this.state.selectedMicDeviceId,
       selectedMicLabel: details.selectedMicLabel ?? this.state.selectedMicLabel,
+      capturePhase: details.capturePhase ?? this.state.capturePhase,
+      lastCaptureChunkCount: details.lastCaptureChunkCount ?? this.state.lastCaptureChunkCount,
+      lastAudioBytes: details.lastAudioBytes ?? this.state.lastAudioBytes,
+      lastAudioMimeType: details.lastAudioMimeType ?? this.state.lastAudioMimeType,
       lastError: details.lastError ?? this.state.lastError
     });
   }

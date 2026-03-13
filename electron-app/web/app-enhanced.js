@@ -680,6 +680,8 @@ class StreamVoiceEnhanced {
                 `Last Audio Path: ${this.speechState?.lastAudioPath || 'none'}`,
                 `Last Audio Size: ${this.speechState?.lastAudioBytes || 0} bytes`,
                 `Last Audio Type: ${this.speechState?.lastAudioMimeType || 'unknown'}`,
+                `Capture Phase: ${this.speechState?.capturePhase || 'unknown'}`,
+                `Capture Chunks: ${this.speechState?.lastCaptureChunkCount || 0}`,
                 `Last Preview Transcript: ${this.speechState?.lastPreviewTranscript || 'none'}`,
                 `Last Preview Sequence: ${this.speechState?.lastPreviewSequence || 0}`,
                 `Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'}ms`,
@@ -1289,6 +1291,8 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Last Audio Path: ${this.speechState?.lastAudioPath || 'none'}
   Last Audio Size: ${this.speechState?.lastAudioBytes || 0} bytes
   Last Audio Type: ${this.speechState?.lastAudioMimeType || 'unknown'}
+  Capture Phase: ${this.speechState?.capturePhase || 'unknown'}
+  Capture Chunks: ${this.speechState?.lastCaptureChunkCount || 0}
   Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'} ms
   Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 200)}
   Last Transcript: ${this.speechState?.transcript || 'none'}

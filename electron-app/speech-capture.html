@@ -186,6 +186,7 @@
         }
 
         try {
+          window.speechCaptureAPI.reportLifecycle({ capturePhase: 'start_requested' });
           await ensureStream(config.deviceId || '');
           recordedChunks = [];
           recordingStartedAt = Date.now();
@@ -201,9 +202,18 @@
           mediaRecorder.ondataavailable = (event) => {
             if (event.data && event.data.size > 0) {
               recordedChunks.push(event.data);
+              window.speechCaptureAPI.reportLifecycle({
+                capturePhase: 'chunk_captured',
+                lastCaptureChunkCount: recordedChunks.length,
+                lastAudioBytes: recordedChunks.reduce((sum, chunk) => sum + chunk.size, 0)
+              });
             }
           };
           mediaRecorder.start(1000);
+          window.speechCaptureAPI.reportLifecycle({
+            capturePhase: 'recording',
+            lastAudioMimeType: mediaRecorder.mimeType || 'audio/webm'
+          });
           if (previewTimer) {
             clearInterval(previewTimer);
           }
@@ -258,6 +268,7 @@
           return;
         }
 
+        window.speechCaptureAPI.reportLifecycle({ capturePhase: 'stop_requested' });
         const recorder = mediaRecorder;
         const startedAt = recordingStartedAt || Date.now();
         mediaRecorder = null;
@@ -273,7 +284,19 @@
         });
 
         try {
+          if (!recordedChunks.length) {
+            window.speechCaptureAPI.reportLifecycle({ capturePhase: 'no_chunks' });
+            window.speechCaptureAPI.reportError('No audio chunks were captured. Try holding the mic button slightly longer.');
+            return;
+          }
+
           const audioBytes = await decodeChunksToWav(recordedChunks);
+          window.speechCaptureAPI.reportLifecycle({
+            capturePhase: 'final_submit_ready',
+            lastCaptureChunkCount: recordedChunks.length,
+            lastAudioBytes: audioBytes.length,
+            lastAudioMimeType: 'audio/wav'
+          });
           recordedChunks = [];
 
           await window.speechCaptureAPI.submitAudio({
@@ -281,7 +304,9 @@
             mimeType: 'audio/wav',
             durationMs: Date.now() - startedAt
           });
+          window.speechCaptureAPI.reportLifecycle({ capturePhase: 'final_submit_sent' });
         } catch (error) {
+          window.speechCaptureAPI.reportLifecycle({ capturePhase: 'final_submit_error' });
           window.speechCaptureAPI.reportError(error.message);
         }
       }

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('speechCaptureAPI', {
   submitPreviewAudio: (payload) => ipcRenderer.invoke('speech-preview-audio', payload),
   submitAudio: (payload) => ipcRenderer.invoke('speech-submit-audio', payload),
   reportError: (message) => ipcRenderer.send('speech-capture-error', message),
+  reportLifecycle: (payload) => ipcRenderer.send('speech-capture-lifecycle', payload),
   reportLevel: (payload) => ipcRenderer.send('speech-capture-level', payload),
   reportReady: () => ipcRenderer.send('speech-capture-ready')
 });

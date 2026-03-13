@@ -258,7 +258,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.26',
+          message: 'StreamVoice v1.1.0-alpha.27',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1261,6 +1261,17 @@ ipcMain.on('speech-capture-level', (_event, payload = {}) => {
     lastError: null
   };
 
+  broadcastSpeechState();
+});
+
+ipcMain.on('speech-capture-lifecycle', (_event, payload = {}) => {
+  speechService.updateCaptureTelemetry({
+    capturePhase: payload.capturePhase,
+    lastCaptureChunkCount: payload.lastCaptureChunkCount,
+    lastAudioBytes: payload.lastAudioBytes,
+    lastAudioMimeType: payload.lastAudioMimeType,
+    lastError: payload.lastError
+  });
   broadcastSpeechState();
 });
 
