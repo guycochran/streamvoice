@@ -1,6 +1,6 @@
 {
   "name": "streamvoice",
-  "version": "1.1.0-alpha.27",
+  "version": "1.1.0-alpha.28",
   "description": "Professional voice control for OBS Studio",
   "main": "main.js",
   "scripts": {

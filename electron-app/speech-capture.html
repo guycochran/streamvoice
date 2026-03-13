@@ -279,8 +279,46 @@
         }
 
         await new Promise((resolve) => {
-          recorder.onstop = resolve;
-          recorder.stop();
+          let settled = false;
+          const finish = () => {
+            if (settled) {
+              return;
+            }
+            settled = true;
+            resolve();
+          };
+
+          recorder.onstop = () => {
+            window.speechCaptureAPI.reportLifecycle({ capturePhase: 'stop_event' });
+            finish();
+          };
+
+          recorder.onerror = (event) => {
+            window.speechCaptureAPI.reportLifecycle({
+              capturePhase: 'stop_error',
+              lastError: event?.error?.message || 'MediaRecorder stop error'
+            });
+            finish();
+          };
+
+          setTimeout(() => {
+            window.speechCaptureAPI.reportLifecycle({ capturePhase: 'stop_timeout' });
+            finish();
+          }, 1500);
+
+          try {
+            if (typeof recorder.requestData === 'function' && recorder.state === 'recording') {
+              recorder.requestData();
+            }
+          } catch (_error) {
+            // Best effort only.
+          }
+
+          try {
+            recorder.stop();
+          } catch (_error) {
+            finish();
+          }
         });
 
         try {
