@@ -399,6 +399,10 @@ async function startSpeechCaptureFlow() {
         deviceId: appSettings.preferredMicDeviceId || '',
         deviceLabel: appSettings.preferredMicLabel || ''
       });
+      speechService.logEvent('capture-started', {
+        mode: speechService.getState().mode,
+        mic: appSettings.preferredMicLabel || 'System Default Microphone'
+      });
       speechService.updateCaptureTelemetry({
         capturePhase: 'native_recording',
         lastError: null
@@ -444,6 +448,11 @@ async function stopSpeechCaptureFlow() {
       broadcastSpeechState();
 
       const captureResult = await getNativeSpeechCaptureService().stopRecording();
+      speechService.logEvent('capture-finished', {
+        audioPath: captureResult.filePath,
+        bytes: captureResult.byteLength,
+        durationMs: captureResult.durationMs
+      });
       speechService.recordWhisperDiagnostics({
         stderr: captureResult.stderr || ''
       });
@@ -672,6 +681,13 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
         attemptCount,
         fallbackUsed: attemptCount > 1
       };
+      speechService.logEvent('whisper-attempt', {
+        attempt: attemptCount,
+        model: attempt.modelPreference,
+        audioPath: attempt.audioPath,
+        transcript: whisperResult.transcript || '(empty)',
+        fallbackUsed: attemptCount > 1
+      });
       const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
 
       if (normalizedTranscript) {
@@ -684,6 +700,13 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
       }
     } catch (error) {
       lastError = error;
+      speechService.logEvent('whisper-error', {
+        attempt: attemptCount,
+        model: attempt.modelPreference,
+        audioPath: attempt.audioPath,
+        error: error.message,
+        fallbackUsed: attemptCount > 1
+      });
       lastWhisperResult = {
         transcript: '',
         durationMs: null,
@@ -753,6 +776,11 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
     throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
   }
 
+  speechService.logEvent('transcript-final', {
+    transcript: normalizedTranscript,
+    audioPath: transcriptionAudioPath || filePath,
+    model: whisperResult?.modelPreference || whisperResult?.modelName || appSettings.speechCommandModel || 'tiny.en'
+  });
   speechService.completeTranscript(normalizedTranscript);
   broadcastSpeechState();
 
@@ -811,6 +839,11 @@ async function processSpeechAudioFile(filePath, payload = {}) {
     throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
   }
 
+  speechService.logEvent('transcript-final', {
+    transcript: normalizedTranscript,
+    audioPath: transcriptionAudioPath || processedFilePath,
+    model: whisperResult?.modelPreference || whisperResult?.modelName || appSettings.speechCommandModel || 'tiny.en'
+  });
   speechService.completeTranscript(normalizedTranscript);
   broadcastSpeechState();
 
@@ -1283,6 +1316,11 @@ async function executeDesktopCommand(command) {
     throw new Error('Command is required');
   }
 
+  speechService.logEvent('command-extracted', {
+    heard: command,
+    command: normalized
+  });
+
   if (normalized.startsWith('switch to ')) {
     result = await desktopSwitchToScene(normalized.replace(/^switch to\s+/, ''));
   } else if (micVolumeMatch) {
@@ -1345,6 +1383,11 @@ async function executeDesktopCommand(command) {
     command: normalized,
     result: result.success ? 'success' : 'error',
     message: result.message
+  });
+  speechService.logEvent('command-result', {
+    command: normalized,
+    success: Boolean(result.success),
+    message: result.message || ''
   });
 
   return result;

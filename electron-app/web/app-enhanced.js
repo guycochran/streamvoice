@@ -1261,6 +1261,7 @@ class StreamVoiceEnhanced {
     updateDiagnosticsPanel() {
         this.renderHealthStatus();
         this.renderCommandActivity();
+        this.renderSpeechActivity();
     }
 
     renderCommandActivity() {
@@ -1284,6 +1285,44 @@ class StreamVoiceEnhanced {
             `;
             li.style.marginBottom = '5px';
             commandList.appendChild(li);
+        });
+    }
+
+    renderSpeechActivity() {
+        const speechList = document.getElementById('diagnostic-speech-list');
+        if (!speechList) return;
+
+        const events = this.speechState?.speechEvents || [];
+        speechList.innerHTML = '';
+
+        if (!events.length) {
+            const li = document.createElement('li');
+            li.textContent = 'No recent speech events';
+            li.style.color = '#95a5a6';
+            speechList.appendChild(li);
+            return;
+        }
+
+        events.slice(-12).reverse().forEach((event) => {
+            const li = document.createElement('li');
+            const timestamp = new Date(event.timestamp).toLocaleTimeString();
+            const details = [];
+            if (event.transcript) details.push(`heard="${event.transcript}"`);
+            if (event.heard) details.push(`heard="${event.heard}"`);
+            if (event.command) details.push(`cmd="${event.command}"`);
+            if (event.model) details.push(`model=${event.model}`);
+            if (event.attempt) details.push(`attempt=${event.attempt}`);
+            if (event.fallbackUsed) details.push('fallback=yes');
+            if (event.error) details.push(`error="${event.error}"`);
+            if (event.message) details.push(`msg="${event.message}"`);
+
+            li.innerHTML = `
+                <span style="color: #666;">${timestamp}</span>
+                <span style="color: #8ab4ff;">[${event.type}]</span>
+                <span style="color: #d1d5db;">${details.join(' ')}</span>
+            `;
+            li.style.marginBottom = '6px';
+            speechList.appendChild(li);
         });
     }
 
@@ -1370,10 +1409,33 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Capture Phase: ${this.speechState?.capturePhase || 'unknown'}
   Capture Chunks: ${this.speechState?.lastCaptureChunkCount || 0}
   Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'} ms
+  Last Whisper Model: ${this.speechState?.lastWhisperModel || 'unknown'}
+  Last Whisper Audio Path: ${this.speechState?.lastWhisperAudioPath || 'none'}
+  Last Whisper Attempts: ${this.speechState?.lastWhisperAttemptCount ?? 0}
+  Last Whisper Fallback: ${this.speechState?.lastWhisperFallbackUsed ? 'yes' : 'no'}
   Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 200)}
   Last Transcript: ${this.speechState?.transcript || 'none'}
   Last Error: ${this.speechState?.lastError || speech.lastError || 'none'}
 `;
+
+        const speechEvents = (this.speechState?.speechEvents || []).slice(-10);
+        report += `\nRecent Speech Activity:\n`;
+        if (speechEvents.length === 0) {
+            report += `  none\n`;
+        } else {
+            speechEvents.forEach((event, index) => {
+                const parts = [`${index + 1}. [${new Date(event.timestamp).toLocaleTimeString()}] ${event.type}`];
+                if (event.transcript) parts.push(`heard="${event.transcript}"`);
+                if (event.heard) parts.push(`heard="${event.heard}"`);
+                if (event.command) parts.push(`cmd="${event.command}"`);
+                if (event.model) parts.push(`model=${event.model}`);
+                if (event.attempt) parts.push(`attempt=${event.attempt}`);
+                if (event.fallbackUsed) parts.push(`fallback=yes`);
+                if (event.error) parts.push(`error="${event.error}"`);
+                if (event.message) parts.push(`msg="${event.message}"`);
+                report += `  ${parts.join(' ')}\n`;
+            });
+        }
 
         // Microphone
         const mic = micHealth;

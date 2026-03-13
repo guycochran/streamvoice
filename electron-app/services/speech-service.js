@@ -38,6 +38,7 @@ class SpeechService extends EventEmitter {
       lastWhisperModel: null,
       lastWhisperAttemptCount: 0,
       lastWhisperFallbackUsed: false,
+      speechEvents: [],
       inputLevel: 0,
       selectedMicDeviceId: '',
       selectedMicLabel: ''
@@ -45,7 +46,10 @@ class SpeechService extends EventEmitter {
   }
 
   getState() {
-    return { ...this.state };
+    return {
+      ...this.state,
+      speechEvents: [...this.state.speechEvents]
+    };
   }
 
   setState(partial) {
@@ -186,6 +190,17 @@ class SpeechService extends EventEmitter {
       lastAudioMimeType: details.lastAudioMimeType ?? this.state.lastAudioMimeType,
       lastError: details.lastError ?? this.state.lastError
     });
+  }
+
+  logEvent(type, details = {}) {
+    const event = {
+      timestamp: new Date().toISOString(),
+      type,
+      ...details
+    };
+
+    const speechEvents = [...this.state.speechEvents, event].slice(-30);
+    return this.setState({ speechEvents });
   }
 }
 
