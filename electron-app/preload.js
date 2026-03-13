@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     speechStartPushToTalk: () => ipcRenderer.invoke('speech-start-push-to-talk'),
     speechStopPushToTalk: () => ipcRenderer.invoke('speech-stop-push-to-talk'),
     speechSubmitAudio: (payload) => ipcRenderer.invoke('speech-submit-audio', payload),
+    speechReportLifecycle: (payload) => ipcRenderer.send('speech-capture-lifecycle', payload),
+    speechReportError: (message) => ipcRenderer.send('speech-capture-error', message),
     getServerBaseUrl: () => ipcRenderer.invoke('get-server-base-url'),
     getBackendLogTail: () => ipcRenderer.invoke('get-backend-log-tail'),
     onDesktopStatusUpdated: (callback) => ipcRenderer.on('desktop-status-updated', (_event, status) => callback(status)),

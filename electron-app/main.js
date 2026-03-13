@@ -258,7 +258,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.30',
+          message: 'StreamVoice v1.1.0-alpha.31',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1222,23 +1222,12 @@ ipcMain.handle('speech-get-state', () => {
 
 ipcMain.handle('speech-start-push-to-talk', () => {
   const state = speechService.startPushToTalk();
-  const captureConfig = {
-    deviceId: appSettings.preferredMicDeviceId || ''
-  };
-  speechCaptureWindow?.webContents.send('speech-capture-start', captureConfig);
-  speechCaptureWindow?.webContents.executeJavaScript(`
-    window.__streamvoiceStartCapture && window.__streamvoiceStartCapture(${JSON.stringify(captureConfig)});
-  `).catch(() => {});
   broadcastSpeechState();
   return state;
 });
 
 ipcMain.handle('speech-stop-push-to-talk', () => {
   const state = speechService.stopPushToTalk();
-  speechCaptureWindow?.webContents.send('speech-capture-stop');
-  speechCaptureWindow?.webContents.executeJavaScript(`
-    window.__streamvoiceStopCapture && window.__streamvoiceStopCapture();
-  `).catch(() => {});
   broadcastSpeechState();
   return state;
 });
