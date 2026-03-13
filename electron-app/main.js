@@ -229,7 +229,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.4',
+          message: 'StreamVoice v1.1.0-alpha.5',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -539,12 +539,37 @@ async function desktopTakeScreenshot() {
 
   const { currentScene } = await getDesktopSceneState();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const screenshotDir = app.getPath('pictures');
   await desktopObs.call('SaveSourceScreenshot', {
     sourceName: currentScene,
     imageFormat: 'png',
-    imageFilePath: `screenshot_${timestamp}.png`
+    imageFilePath: path.join(screenshotDir, `streamvoice-screenshot-${timestamp}.png`)
   });
   return { success: true, message: 'Screenshot saved' };
+}
+
+async function desktopSetVolume(target, percent) {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const input = await findDesktopInput(target);
+  if (!input) {
+    throw new Error(`Audio source "${target}" not found`);
+  }
+
+  const normalizedPercent = Math.max(0, Math.min(100, Number(percent)));
+  const volumeDb = normalizedPercent === 0 ? -100 : (normalizedPercent / 100 * 100) - 100;
+
+  await desktopObs.call('SetInputVolume', {
+    inputName: input.inputName,
+    inputVolumeDb: volumeDb
+  });
+
+  return {
+    success: true,
+    message: `${input.inputName} volume set to ${normalizedPercent}%`
+  };
 }
 
 async function desktopStartRecording() {
@@ -585,6 +610,8 @@ async function desktopStopRecording() {
 
 async function executeDesktopCommand(command) {
   const normalized = String(command || '').trim().toLowerCase();
+  const micVolumeMatch = normalized.match(/^mic volume (\d+)\s*percent$/);
+  const desktopVolumeMatch = normalized.match(/^desktop volume (\d+)\s*percent$/);
   let result;
 
   if (!normalized) {
@@ -593,6 +620,10 @@ async function executeDesktopCommand(command) {
 
   if (normalized.startsWith('switch to ')) {
     result = await desktopSwitchToScene(normalized.replace(/^switch to\s+/, ''));
+  } else if (micVolumeMatch) {
+    result = await desktopSetVolume('mic', micVolumeMatch[1]);
+  } else if (desktopVolumeMatch) {
+    result = await desktopSetVolume('desktop', desktopVolumeMatch[1]);
   } else if (normalized === 'start recording') {
     result = await desktopStartRecording();
   } else if (normalized === 'start streaming') {
