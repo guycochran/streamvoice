@@ -1192,6 +1192,13 @@ function getSceneAliases(targetScene) {
     gameplay: ['gameplay', 'game', 'gaming', 'play', 'main gameplay'],
     chatting: ['chatting', 'just chatting', 'chat'],
     camera: ['camera', 'cam'],
+    camera1: ['camera 1', 'cam 1', 'cam one', 'camera one', 'one', 'shot 1'],
+    camera2: ['camera 2', 'cam 2', 'cam two', 'camera two', 'two', 'shot 2'],
+    camera3: ['camera 3', 'cam 3', 'cam three', 'camera three', 'three', 'shot 3'],
+    camera4: ['camera 4', 'cam 4', 'cam four', 'camera four', 'four', 'shot 4'],
+    pip: ['pip', 'picture in picture', 'picture in picture scene'],
+    browser: ['browser', 'browser scene', 'web'],
+    powerpoint: ['powerpoint', 'power point', 'slides', 'slide deck', 'presentation'],
     desktop: ['desktop', 'screen', 'screen share']
   };
 
