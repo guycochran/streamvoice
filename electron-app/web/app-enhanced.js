@@ -10,6 +10,7 @@ class StreamVoiceEnhanced {
         this.apiBaseUrl = this.detectApiBaseUrl();
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
+        this.speechGameMode = true;
         this.currentMicLevel = 0;
         this.voiceInputMode = 'push_to_talk';
         this.activeVoicePointerId = null;
@@ -37,6 +38,8 @@ class StreamVoiceEnhanced {
         this.commandCategories = document.getElementById('command-categories');
         this.currentSceneElement = document.getElementById('current-scene');
         this.sceneCountElement = document.getElementById('scene-count');
+        this.gameModeIndicator = document.getElementById('game-mode-indicator');
+        this.gameModeLabel = document.getElementById('game-mode-label');
 
         this.init();
     }
@@ -89,11 +92,14 @@ class StreamVoiceEnhanced {
         try {
             const settings = await window.electronAPI.getSettings();
             this.voiceInputMode = settings.speechInputMode || 'push_to_talk';
+            this.speechGameMode = settings.speechGameMode !== false;
         } catch (_error) {
             this.voiceInputMode = 'push_to_talk';
+            this.speechGameMode = true;
         }
 
         this.updateVoiceModeUI();
+        this.updateGameModeIndicator();
     }
 
     connectWebSocket() {
@@ -495,6 +501,19 @@ class StreamVoiceEnhanced {
         }
     }
 
+    updateGameModeIndicator() {
+        if (!this.gameModeIndicator || !this.gameModeLabel) {
+            return;
+        }
+
+        const enabled = this.speechGameMode !== false;
+        this.gameModeIndicator.classList.toggle('active', enabled);
+        this.gameModeLabel.textContent = enabled ? 'Game Mode' : 'Standard Mode';
+        this.gameModeIndicator.title = enabled
+            ? 'Low-latency Game Mode is active'
+            : 'Game Mode is off';
+    }
+
     startListening() {
         if (!this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStartPushToTalk) {
             this.isListening = true;
@@ -753,6 +772,11 @@ class StreamVoiceEnhanced {
         const obsHealth = health.obs || {};
         const speechHealth = health.speech || {};
         const micHealth = health.microphone || {};
+
+        if (Object.prototype.hasOwnProperty.call(speechHealth, 'gameMode')) {
+            this.speechGameMode = speechHealth.gameMode !== false;
+            this.updateGameModeIndicator();
+        }
 
         // Update individual subsystem statuses in UI
         const getStatusColor = (status) => {

@@ -826,6 +826,7 @@ function getDesktopHealthStatus() {
         status: speechState.status || 'unknown',
         engine: speechState.provider || 'whisper.cpp',
         supported: speechState.available,
+        gameMode: appSettings.speechGameMode !== false,
         model: speechState.model,
         modelStatus: speechState.modelStatus,
         inputLevel: speechState.inputLevel,
@@ -1449,7 +1450,7 @@ let appSettings = {
   speechInputMode: 'push_to_talk',
   speechCommandModel: 'tiny.en',
   speechGameMode: true,
-  voiceHotkey: '',
+  voiceHotkey: 'Ctrl+Shift+`',
   preferredMicDeviceId: '',
   preferredMicLabel: '',
   sceneMappings: {
