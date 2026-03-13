@@ -38,6 +38,10 @@ jobs:
       working-directory: electron-app
       run: npm run prepare-whisper
 
+    - name: Prepare ffmpeg assets
+      working-directory: electron-app
+      run: npm run prepare-ffmpeg
+
     - name: Build Electron app
       working-directory: electron-app
       env:

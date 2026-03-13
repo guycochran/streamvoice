@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { SpeechService } = require('./services/speech-service');
 const { resolveWhisperConfig, transcribeWithWhisper } = require('./services/whisper-runner');
+const { NativeSpeechCaptureService } = require('./services/native-speech-capture-service');
 
 let mainWindow;
 let speechCaptureWindow;
@@ -17,6 +18,7 @@ let appSettingsFilePath;
 let backendLogFilePath;
 let speechCaptureDirPath;
 const speechUploadSessions = new Map();
+let nativeSpeechCaptureService;
 let desktopObsReconnectTimer = null;
 let latestSpeechPreviewSequence = 0;
 const speechService = new SpeechService();
@@ -259,7 +261,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.34',
+          message: 'StreamVoice v1.1.0-alpha.35',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -366,6 +368,21 @@ function ensureSpeechCaptureDir() {
   return speechCaptureDirPath;
 }
 
+function getNativeSpeechCaptureService() {
+  if (!nativeSpeechCaptureService) {
+    nativeSpeechCaptureService = new NativeSpeechCaptureService({
+      appRoot: __dirname,
+      speechCaptureDir: ensureSpeechCaptureDir()
+    });
+  }
+
+  return nativeSpeechCaptureService;
+}
+
+function shouldUseNativeSpeechCapture() {
+  return getNativeSpeechCaptureService().isSupported();
+}
+
 async function persistSpeechCapture(audioBytes, metadata = {}) {
   const captureDir = ensureSpeechCaptureDir();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -416,6 +433,47 @@ async function processSpeechAudioSubmission(audioBytes, payload = {}) {
     durationMs: payload.durationMs,
     audioBytes: audioBytes?.length || 0,
     mimeType: payload.mimeType
+  });
+  updateSpeechRuntimeConfig();
+  broadcastSpeechState();
+
+  const whisperResult = await transcribeWithWhisper({
+    audioPath: filePath,
+    appRoot: __dirname,
+    userDataPath: app.getPath('userData')
+  });
+  speechService.recordWhisperDiagnostics(whisperResult);
+  const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+
+  if (!normalizedTranscript) {
+    throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
+  }
+
+  speechService.completeTranscript(normalizedTranscript);
+  broadcastSpeechState();
+
+  const commandResult = await executeDesktopCommand(normalizedTranscript);
+  speechService.recordCommand(normalizedTranscript, commandResult);
+  broadcastSpeechState();
+
+  return {
+    success: true,
+    filePath,
+    transcript: normalizedTranscript,
+    commandResult,
+    state: speechService.getState()
+  };
+}
+
+async function processSpeechAudioFile(filePath, payload = {}) {
+  latestSpeechPreviewSequence = 0;
+  const fileStats = await fs.promises.stat(filePath);
+
+  speechService.completeCapture({
+    filePath,
+    durationMs: payload.durationMs,
+    audioBytes: fileStats.size,
+    mimeType: payload.mimeType || 'audio/wav'
   });
   updateSpeechRuntimeConfig();
   broadcastSpeechState();
@@ -1294,6 +1352,23 @@ ipcMain.handle('speech-get-state', () => {
 
 ipcMain.handle('speech-start-push-to-talk', () => {
   const state = speechService.startPushToTalk();
+  broadcastSpeechState();
+  if (shouldUseNativeSpeechCapture()) {
+    getNativeSpeechCaptureService().startRecording({
+      deviceLabel: appSettings.preferredMicLabel || ''
+    }).then(() => {
+      speechService.updateCaptureTelemetry({
+        capturePhase: 'native_recording',
+        lastError: null
+      });
+      broadcastSpeechState();
+    }).catch((error) => {
+      speechService.fail(error);
+      broadcastSpeechState();
+    });
+    return state;
+  }
+
   const captureConfig = {
     deviceId: appSettings.preferredMicDeviceId || ''
   };
@@ -1301,17 +1376,49 @@ ipcMain.handle('speech-start-push-to-talk', () => {
   speechCaptureWindow?.webContents.executeJavaScript(`
     window.__streamvoiceStartCapture && window.__streamvoiceStartCapture(${JSON.stringify(captureConfig)});
   `).catch(() => {});
-  broadcastSpeechState();
   return state;
 });
 
-ipcMain.handle('speech-stop-push-to-talk', () => {
+ipcMain.handle('speech-stop-push-to-talk', async () => {
   const state = speechService.stopPushToTalk();
+  broadcastSpeechState();
+  if (shouldUseNativeSpeechCapture()) {
+    try {
+      speechService.updateCaptureTelemetry({
+        capturePhase: 'native_finalizing'
+      });
+      broadcastSpeechState();
+
+      const captureResult = await getNativeSpeechCaptureService().stopRecording();
+      speechService.recordWhisperDiagnostics({
+        stderr: captureResult.stderr || ''
+      });
+      speechService.updateCaptureTelemetry({
+        capturePhase: 'native_recorded',
+        lastAudioBytes: captureResult.byteLength,
+        lastAudioMimeType: 'audio/wav'
+      });
+      broadcastSpeechState();
+
+      return await processSpeechAudioFile(captureResult.filePath, {
+        durationMs: captureResult.durationMs,
+        mimeType: 'audio/wav'
+      });
+    } catch (error) {
+      const failedState = speechService.fail(error);
+      broadcastSpeechState();
+      return {
+        success: false,
+        error: error.message,
+        state: failedState
+      };
+    }
+  }
+
   speechCaptureWindow?.webContents.send('speech-capture-stop');
   speechCaptureWindow?.webContents.executeJavaScript(`
     window.__streamvoiceStopCapture && window.__streamvoiceStopCapture();
   `).catch(() => {});
-  broadcastSpeechState();
   return state;
 });
 
