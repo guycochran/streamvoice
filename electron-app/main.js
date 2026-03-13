@@ -16,6 +16,7 @@ let obsSettingsFilePath;
 let appSettingsFilePath;
 let backendLogFilePath;
 let speechCaptureDirPath;
+const speechUploadSessions = new Map();
 let desktopObsReconnectTimer = null;
 let latestSpeechPreviewSequence = 0;
 const speechService = new SpeechService();
@@ -258,7 +259,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.32',
+          message: 'StreamVoice v1.1.0-alpha.33',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -374,6 +375,77 @@ async function persistSpeechCapture(audioBytes, metadata = {}) {
   const filePath = path.join(captureDir, `utterance-${timestamp}.${extension}`);
   await fs.promises.writeFile(filePath, Buffer.from(audioBytes));
   return filePath;
+}
+
+function createSpeechUploadSession(metadata = {}) {
+  const uploadId = `speech-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  speechUploadSessions.set(uploadId, {
+    uploadId,
+    chunks: [],
+    byteLength: 0,
+    mimeType: metadata.mimeType || 'audio/wav',
+    durationMs: metadata.durationMs || 0
+  });
+  return uploadId;
+}
+
+function appendSpeechUploadChunk(uploadId, audioChunk = []) {
+  const session = speechUploadSessions.get(uploadId);
+  if (!session) {
+    throw new Error('Speech upload session not found');
+  }
+
+  const chunkBuffer = Buffer.from(audioChunk);
+  session.chunks.push(chunkBuffer);
+  session.byteLength += chunkBuffer.length;
+
+  return {
+    uploadId,
+    totalBytes: session.byteLength,
+    chunkCount: session.chunks.length
+  };
+}
+
+async function processSpeechAudioSubmission(audioBytes, payload = {}) {
+  latestSpeechPreviewSequence = 0;
+  const filePath = await persistSpeechCapture(audioBytes, {
+    mimeType: payload.mimeType
+  });
+  speechService.completeCapture({
+    filePath,
+    durationMs: payload.durationMs,
+    audioBytes: audioBytes?.length || 0,
+    mimeType: payload.mimeType
+  });
+  updateSpeechRuntimeConfig();
+  broadcastSpeechState();
+
+  const whisperResult = await transcribeWithWhisper({
+    audioPath: filePath,
+    appRoot: __dirname,
+    userDataPath: app.getPath('userData')
+  });
+  speechService.recordWhisperDiagnostics(whisperResult);
+  const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+
+  if (!normalizedTranscript) {
+    throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
+  }
+
+  speechService.completeTranscript(normalizedTranscript);
+  broadcastSpeechState();
+
+  const commandResult = await executeDesktopCommand(normalizedTranscript);
+  speechService.recordCommand(normalizedTranscript, commandResult);
+  broadcastSpeechState();
+
+  return {
+    success: true,
+    filePath,
+    transcript: normalizedTranscript,
+    commandResult,
+    state: speechService.getState()
+  };
 }
 
 function loadDesktopObsSettings() {
@@ -1290,45 +1362,58 @@ ipcMain.on('speech-capture-lifecycle', (_event, payload = {}) => {
 
 ipcMain.handle('speech-submit-audio', async (_event, payload) => {
   try {
-    latestSpeechPreviewSequence = 0;
-    const filePath = await persistSpeechCapture(payload.audioBytes, {
-      mimeType: payload.mimeType
-    });
-    speechService.completeCapture({
-      filePath,
-      durationMs: payload.durationMs,
-      audioBytes: payload.audioBytes?.length || 0,
-      mimeType: payload.mimeType
-    });
-    updateSpeechRuntimeConfig();
+    return await processSpeechAudioSubmission(payload.audioBytes, payload);
+  } catch (error) {
+    const state = speechService.fail(error);
     broadcastSpeechState();
+    return {
+      success: false,
+      error: error.message,
+      state
+    };
+  }
+});
 
-    const whisperResult = await transcribeWithWhisper({
-      audioPath: filePath,
-      appRoot: __dirname,
-      userDataPath: app.getPath('userData')
-    });
-    speechService.recordWhisperDiagnostics(whisperResult);
-    const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
+ipcMain.handle('speech-begin-audio-upload', async (_event, payload = {}) => {
+  const uploadId = createSpeechUploadSession(payload);
+  return {
+    success: true,
+    uploadId
+  };
+});
 
-    if (!normalizedTranscript) {
-      throw new Error('Whisper did not recognize speech. Try a slightly longer phrase like "unmute mic" or "start stream".');
-    }
-
-    speechService.completeTranscript(normalizedTranscript);
-    broadcastSpeechState();
-
-    const commandResult = await executeDesktopCommand(normalizedTranscript);
-    speechService.recordCommand(normalizedTranscript, commandResult);
-    broadcastSpeechState();
-
+ipcMain.handle('speech-append-audio-upload-chunk', async (_event, payload = {}) => {
+  try {
+    const result = appendSpeechUploadChunk(payload.uploadId, payload.audioChunk || []);
     return {
       success: true,
-      filePath,
-      transcript: normalizedTranscript,
-      commandResult,
-      state: speechService.getState()
+      ...result
     };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+ipcMain.handle('speech-complete-audio-upload', async (_event, payload = {}) => {
+  const session = speechUploadSessions.get(payload.uploadId);
+  if (!session) {
+    return {
+      success: false,
+      error: 'Speech upload session not found'
+    };
+  }
+
+  speechUploadSessions.delete(payload.uploadId);
+
+  try {
+    const audioBytes = Buffer.concat(session.chunks);
+    return await processSpeechAudioSubmission(audioBytes, {
+      mimeType: payload.mimeType || session.mimeType,
+      durationMs: payload.durationMs || session.durationMs
+    });
   } catch (error) {
     const state = speechService.fail(error);
     broadcastSpeechState();

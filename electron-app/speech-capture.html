@@ -20,6 +20,7 @@
       let previewTimer = null;
       let previewInFlight = false;
       let previewSequence = 0;
+      const FINAL_UPLOAD_CHUNK_SIZE = 8192;
 
       function getConstraints(deviceId = '') {
         if (deviceId) {
@@ -340,10 +341,37 @@
           recordedChunks = [];
 
           try {
-            // Convert Uint8Array to regular array for IPC serialization
-            const audioArray = Array.from(audioBytes);
-            const submitResult = await window.speechCaptureAPI.submitAudio({
-              audioBytes: audioArray,
+            const submitStartedAt = Date.now();
+            const uploadSession = await window.speechCaptureAPI.beginAudioUpload({
+              mimeType: 'audio/wav',
+              durationMs: Date.now() - startedAt
+            });
+
+            if (!uploadSession?.success || !uploadSession.uploadId) {
+              throw new Error(uploadSession?.error || 'Failed to begin audio upload');
+            }
+
+            const uploadId = uploadSession.uploadId;
+            for (let offset = 0; offset < audioBytes.length; offset += FINAL_UPLOAD_CHUNK_SIZE) {
+              const appendResult = await window.speechCaptureAPI.appendAudioUploadChunk({
+                uploadId,
+                audioChunk: Array.from(audioBytes.slice(offset, offset + FINAL_UPLOAD_CHUNK_SIZE))
+              });
+
+              if (!appendResult?.success) {
+                throw new Error(appendResult?.error || 'Failed to append audio upload chunk');
+              }
+
+              window.speechCaptureAPI.reportLifecycle({
+                capturePhase: 'uploading',
+                lastCaptureChunkCount: recordedChunks.length,
+                lastAudioBytes: appendResult.totalBytes,
+                lastAudioMimeType: 'audio/wav'
+              });
+            }
+
+            const submitResult = await window.speechCaptureAPI.completeAudioUpload({
+              uploadId,
               mimeType: 'audio/wav',
               durationMs: Date.now() - startedAt
             });
@@ -352,7 +380,13 @@
               throw new Error(submitResult.error || 'Audio submission failed');
             }
 
-            window.speechCaptureAPI.reportLifecycle({ capturePhase: 'final_submit_sent' });
+            window.speechCaptureAPI.reportLifecycle({
+              capturePhase: 'final_submit_sent',
+              lastAudioBytes: audioBytes.length,
+              lastAudioMimeType: 'audio/wav',
+              lastError: null,
+              uploadDurationMs: Date.now() - submitStartedAt
+            });
           } catch (submitError) {
             window.speechCaptureAPI.reportLifecycle({
               capturePhase: 'final_submit_error',
