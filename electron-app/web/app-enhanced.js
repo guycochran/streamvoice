@@ -11,15 +11,9 @@ class StreamVoiceEnhanced {
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
         this.mediaStream = null;
-        this.audioContext = null;
-        this.audioSourceNode = null;
-        this.audioProcessorNode = null;
-        this.audioMonitorNode = null;
-        this.audioCaptureDestination = null;
-        this.audioChunks = [];
-        this.audioSampleRate = 16000;
+        this.mediaRecorder = null;
+        this.recordedChunks = [];
         this.recordingStartedAt = null;
-        this.desktopRecordingActive = false;
         this.statusPollInterval = null;
         this.serverReachable = false;
         this.wsConnected = false;
@@ -422,55 +416,36 @@ class StreamVoiceEnhanced {
     }
 
     async beginDesktopRecording() {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!this.hasDesktopBridge || !navigator.mediaDevices?.getUserMedia || !AudioContextClass) {
+        if (!this.hasDesktopBridge || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
             return;
         }
 
-        if (this.audioContext || this.desktopRecordingActive) {
+        if (this.mediaRecorder) {
             return;
         }
 
         try {
             this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.audioChunks = [];
+            this.recordedChunks = [];
             this.recordingStartedAt = Date.now();
-            try {
-                this.audioContext = new AudioContextClass({ sampleRate: 16000 });
-            } catch (_error) {
-                this.audioContext = new AudioContextClass();
+            const options = {};
+            if (MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus')) {
+                options.mimeType = 'audio/webm;codecs=opus';
+            } else if (MediaRecorder.isTypeSupported?.('audio/webm')) {
+                options.mimeType = 'audio/webm';
             }
-            this.audioSampleRate = this.audioContext.sampleRate;
-            this.audioSourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-            if (typeof this.audioContext.createScriptProcessor !== 'function') {
-                throw new Error('Audio capture is not supported in this build');
-            }
-            this.audioProcessorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
-            this.audioMonitorNode = this.audioContext.createGain();
-            this.audioMonitorNode.gain.value = 0;
-            this.audioCaptureDestination = this.audioContext.createMediaStreamDestination();
-            this.audioProcessorNode.onaudioprocess = (event) => {
-                const channel = event.inputBuffer.getChannelData(0);
-                this.audioChunks.push(new Float32Array(channel));
+            this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    this.recordedChunks.push(event.data);
+                }
             };
-            this.audioSourceNode.connect(this.audioProcessorNode);
-            this.audioProcessorNode.connect(this.audioMonitorNode);
-            this.audioMonitorNode.connect(this.audioCaptureDestination);
-            this.desktopRecordingActive = true;
+            this.mediaRecorder.start();
         } catch (error) {
-            this.audioMonitorNode?.disconnect();
-            this.audioProcessorNode?.disconnect();
-            this.audioSourceNode?.disconnect();
-            this.audioCaptureDestination?.disconnect?.();
             this.mediaStream?.getTracks().forEach((track) => track.stop());
-            this.audioContext?.close?.().catch(() => {});
             this.mediaStream = null;
-            this.audioContext = null;
-            this.audioSourceNode = null;
-            this.audioProcessorNode = null;
-            this.audioMonitorNode = null;
-            this.audioCaptureDestination = null;
-            this.desktopRecordingActive = false;
+            this.mediaRecorder = null;
+            this.recordedChunks = [];
             this.result.textContent = `Speech capture error: ${error.message}`;
             this.result.style.color = '#e74c3c';
             throw error;
@@ -478,38 +453,26 @@ class StreamVoiceEnhanced {
     }
 
     async finishDesktopRecording() {
-        if (!this.audioContext || !this.desktopRecordingActive) {
+        if (!this.mediaRecorder) {
             return;
         }
 
-        this.desktopRecordingActive = false;
-
         const stream = this.mediaStream;
         const startedAt = this.recordingStartedAt || Date.now();
-        const context = this.audioContext;
-        const sourceNode = this.audioSourceNode;
-        const processorNode = this.audioProcessorNode;
-        const monitorNode = this.audioMonitorNode;
-        const captureDestination = this.audioCaptureDestination;
-        const chunks = this.audioChunks.slice();
+        const recorder = this.mediaRecorder;
 
         this.mediaStream = null;
-        this.audioContext = null;
-        this.audioSourceNode = null;
-        this.audioProcessorNode = null;
-        this.audioMonitorNode = null;
-        this.audioCaptureDestination = null;
+        this.mediaRecorder = null;
         this.recordingStartedAt = null;
-        this.audioChunks = [];
-
-        processorNode?.disconnect();
-        sourceNode?.disconnect();
-        monitorNode?.disconnect();
-        captureDestination?.disconnect?.();
+        await new Promise((resolve) => {
+            recorder.onstop = resolve;
+            recorder.stop();
+        });
         stream?.getTracks().forEach((track) => track.stop());
-        await context.close().catch(() => {});
 
-        const wavBytes = this.encodeWavFromChunks(chunks, this.audioSampleRate);
+        const blob = new Blob(this.recordedChunks, { type: recorder.mimeType || 'audio/webm' });
+        this.recordedChunks = [];
+        const wavBytes = await this.convertBlobToWav(blob);
 
         if (!wavBytes || wavBytes.length === 0) {
             this.result.textContent = 'Speech capture error: no audio captured';
@@ -531,13 +494,28 @@ class StreamVoiceEnhanced {
         }
     }
 
-    encodeWavFromChunks(chunks, sampleRate) {
-        if (!chunks || chunks.length === 0) {
+    async convertBlobToWav(blob) {
+        if (!blob || blob.size === 0) {
             return null;
         }
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+            throw new Error('Audio decoding is not supported in this build');
+        }
 
-        const sampleCount = chunks.reduce((total, chunk) => total + chunk.length, 0);
-        const pcmBytes = sampleCount * 2;
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioContext = new AudioContextClass();
+        let audioBuffer;
+        try {
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+        } finally {
+            await audioContext.close().catch(() => {});
+        }
+
+        const sampleRate = 16000;
+        const channelData = audioBuffer.getChannelData(0);
+        const pcmData = this.resampleTo16k(channelData, audioBuffer.sampleRate, sampleRate);
+        const pcmBytes = pcmData.length * 2;
         const buffer = new ArrayBuffer(44 + pcmBytes);
         const view = new DataView(buffer);
 
@@ -562,15 +540,33 @@ class StreamVoiceEnhanced {
         view.setUint32(40, pcmBytes, true);
 
         let offset = 44;
-        chunks.forEach((chunk) => {
-            for (let i = 0; i < chunk.length; i++) {
-                const sample = Math.max(-1, Math.min(1, chunk[i]));
-                view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-                offset += 2;
-            }
-        });
+        for (let i = 0; i < pcmData.length; i++) {
+            const sample = Math.max(-1, Math.min(1, pcmData[i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+            offset += 2;
+        }
 
         return new Uint8Array(buffer);
+    }
+
+    resampleTo16k(channelData, inputRate, targetRate) {
+        if (inputRate === targetRate) {
+            return channelData;
+        }
+
+        const ratio = inputRate / targetRate;
+        const outputLength = Math.max(1, Math.round(channelData.length / ratio));
+        const output = new Float32Array(outputLength);
+
+        for (let i = 0; i < outputLength; i++) {
+            const sourceIndex = i * ratio;
+            const lower = Math.floor(sourceIndex);
+            const upper = Math.min(lower + 1, channelData.length - 1);
+            const weight = sourceIndex - lower;
+            output[i] = channelData[lower] * (1 - weight) + channelData[upper] * weight;
+        }
+
+        return output;
     }
 
     bindSpeechState() {
