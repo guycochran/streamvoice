@@ -17,6 +17,9 @@
       let levelTimer = null;
       let activeDeviceId = '';
       let activeDeviceLabel = 'System Default Microphone';
+      let previewTimer = null;
+      let previewInFlight = false;
+      let previewSequence = 0;
 
       function getConstraints(deviceId = '') {
         if (deviceId) {
@@ -200,9 +203,53 @@
               recordedChunks.push(event.data);
             }
           };
-          mediaRecorder.start();
+          mediaRecorder.start(1000);
+          if (previewTimer) {
+            clearInterval(previewTimer);
+          }
+          previewTimer = setInterval(() => {
+            submitPreview(false);
+          }, 2500);
         } catch (error) {
           window.speechCaptureAPI.reportError(error.message);
+        }
+      }
+
+      async function decodeChunksToWav(chunks) {
+        const blob = new Blob(chunks, { type: mediaRecorder?.mimeType || 'audio/webm' });
+        const blobBuffer = await blob.arrayBuffer();
+        const decodeContext = new AudioContext();
+        const audioBuffer = await decodeContext.decodeAudioData(blobBuffer.slice(0));
+        const audioBytes = encodeWav(audioBuffer);
+        await decodeContext.close();
+        return audioBytes;
+      }
+
+      async function submitPreview(force) {
+        if (!mediaRecorder || previewInFlight || recordedChunks.length === 0) {
+          return;
+        }
+
+        const durationMs = Date.now() - (recordingStartedAt || Date.now());
+        if (!force && durationMs < 1500) {
+          return;
+        }
+
+        previewInFlight = true;
+        const currentSequence = ++previewSequence;
+
+        try {
+          const previewBytes = await decodeChunksToWav(recordedChunks);
+          await window.speechCaptureAPI.submitPreviewAudio({
+            audioBytes: previewBytes,
+            mimeType: 'audio/wav',
+            durationMs,
+            sequence: currentSequence
+          });
+        } catch (_error) {
+          // Preview is best-effort. Final transcription still runs on stop.
+        } finally {
+          previewInFlight = false;
         }
       }
 
@@ -215,6 +262,10 @@
         const startedAt = recordingStartedAt || Date.now();
         mediaRecorder = null;
         recordingStartedAt = null;
+        if (previewTimer) {
+          clearInterval(previewTimer);
+          previewTimer = null;
+        }
 
         await new Promise((resolve) => {
           recorder.onstop = resolve;
@@ -222,13 +273,8 @@
         });
 
         try {
-          const blob = new Blob(recordedChunks, { type: recorder.mimeType || 'audio/webm' });
+          const audioBytes = await decodeChunksToWav(recordedChunks);
           recordedChunks = [];
-          const blobBuffer = await blob.arrayBuffer();
-          const decodeContext = new AudioContext();
-          const audioBuffer = await decodeContext.decodeAudioData(blobBuffer.slice(0));
-          const audioBytes = encodeWav(audioBuffer);
-          await decodeContext.close();
 
           await window.speechCaptureAPI.submitAudio({
             audioBytes,

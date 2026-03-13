@@ -522,14 +522,18 @@ class StreamVoiceEnhanced {
                 this.transcript.textContent = 'Listening...';
                 this.transcript.style.color = '#95a5a6';
                 if (this.heardCommand) {
-                    this.heardCommand.textContent = 'Heard: listening...';
+                    this.heardCommand.textContent = state.partialTranscript
+                        ? `Heard: "${state.partialTranscript}"`
+                        : 'Heard: listening...';
                     this.heardCommand.style.color = '#8ab4ff';
                 }
             } else if (state.status === 'transcribing') {
                 this.transcript.textContent = 'Transcribing...';
                 this.transcript.style.color = '#95a5a6';
                 if (this.heardCommand) {
-                    this.heardCommand.textContent = 'Heard: processing your phrase...';
+                    this.heardCommand.textContent = state.partialTranscript
+                        ? `Heard: "${state.partialTranscript}"`
+                        : 'Heard: processing your phrase...';
                     this.heardCommand.style.color = '#8ab4ff';
                 }
                 if (state.lastAudioPath) {

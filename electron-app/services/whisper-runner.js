@@ -52,7 +52,7 @@ function resolveWhisperConfig({ appRoot, userDataPath }) {
   };
 }
 
-async function transcribeWithWhisper({ audioPath, appRoot, userDataPath }) {
+async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeoutMs = WHISPER_TIMEOUT_MS }) {
   const { binaryPath, modelPath } = resolveWhisperConfig({ appRoot, userDataPath });
 
   if (!binaryPath) {
@@ -88,7 +88,7 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath }) {
       settled = true;
       child.kill();
       reject(new Error(formatWhisperTimeout(stderr)));
-    }, WHISPER_TIMEOUT_MS);
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString();

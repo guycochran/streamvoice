@@ -17,6 +17,7 @@ let appSettingsFilePath;
 let backendLogFilePath;
 let speechCaptureDirPath;
 let desktopObsReconnectTimer = null;
+let latestSpeechPreviewSequence = 0;
 const speechService = new SpeechService();
 const LOCAL_API_PORT = '3030';
 const LOCAL_WS_PORT = '8090';
@@ -257,7 +258,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.21',
+          message: 'StreamVoice v1.1.0-alpha.22',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1216,6 +1217,7 @@ ipcMain.on('speech-capture-level', (_event, payload = {}) => {
 
 ipcMain.handle('speech-submit-audio', async (_event, payload) => {
   try {
+    latestSpeechPreviewSequence = 0;
     const filePath = await persistSpeechCapture(payload.audioBytes, {
       mimeType: payload.mimeType
     });
@@ -1258,6 +1260,52 @@ ipcMain.handle('speech-submit-audio', async (_event, payload) => {
       success: false,
       error: error.message,
       state
+    };
+  }
+});
+
+ipcMain.handle('speech-preview-audio', async (_event, payload) => {
+  try {
+    const sequence = Number(payload.sequence || 0);
+    if (sequence < latestSpeechPreviewSequence) {
+      return {
+        success: true,
+        ignored: true
+      };
+    }
+
+    latestSpeechPreviewSequence = sequence;
+    const filePath = await persistSpeechCapture(payload.audioBytes, {
+      mimeType: payload.mimeType
+    });
+    const { transcript } = await transcribeWithWhisper({
+      audioPath: filePath,
+      appRoot: __dirname,
+      userDataPath: app.getPath('userData'),
+      timeoutMs: 7000
+    });
+    const normalizedTranscript = normalizeSpeechTranscript(transcript);
+
+    if (sequence !== latestSpeechPreviewSequence) {
+      return {
+        success: true,
+        ignored: true
+      };
+    }
+
+    if (normalizedTranscript) {
+      speechService.updatePartialTranscript(normalizedTranscript);
+      broadcastSpeechState();
+    }
+
+    return {
+      success: true,
+      transcript: normalizedTranscript
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
     };
   }
 });

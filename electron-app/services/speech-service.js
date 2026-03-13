@@ -16,6 +16,7 @@ class SpeechService extends EventEmitter {
       modelPath: null,
       binaryPath: null,
       transcript: '',
+      partialTranscript: '',
       lastTranscriptAt: null,
       lastCommand: null,
       lastCommandStatus: null,
@@ -63,6 +64,7 @@ class SpeechService extends EventEmitter {
       transcribing: false,
       status: 'recording',
       transcript: '',
+      partialTranscript: '',
       lastCommand: null,
       lastCommandStatus: null,
       lastCommandMessage: null,
@@ -81,6 +83,7 @@ class SpeechService extends EventEmitter {
   completeTranscript(transcript) {
     return this.setState({
       transcript,
+      partialTranscript: transcript,
       transcribing: false,
       status: 'ready',
       lastTranscriptAt: new Date().toISOString(),
@@ -121,6 +124,12 @@ class SpeechService extends EventEmitter {
       lastAudioPath: details.filePath || null,
       lastAudioDurationMs: details.durationMs || 0,
       lastError: null
+    });
+  }
+
+  updatePartialTranscript(transcript = '') {
+    return this.setState({
+      partialTranscript: transcript || this.state.partialTranscript
     });
   }
 
