@@ -261,7 +261,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-alpha.36',
+          message: 'StreamVoice v1.1.0-alpha.37',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -721,10 +721,12 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('subscriber celebration')) return 'subscriber celebration';
   if (includesPhrase('raid mode')) return 'raid mode';
   if (includesPhrase('start streaming') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
+  if (includesPhrase('stop streaming') || includesPhrase('stop stream') || includesPhrase('end stream')) return 'stop stream';
   if (includesPhrase('start recording') || includesPhrase('record')) return 'record';
+  if (includesPhrase('stop recording') || includesPhrase('end recording')) return 'stop recording';
   if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
-  if (includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
-  if (includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
+  if (includesPhrase('unmute microphone') || includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
+  if (includesPhrase('mute microphone') || includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
 
   if (normalized.includes('switch to ')) {
     const target = normalized.split('switch to ')[1]?.trim();
@@ -944,11 +946,15 @@ async function executeDesktopCommand(command) {
     result = await desktopSetVolume('desktop', desktopVolumeMatch[1]);
   } else if (normalized === 'start recording' || normalized === 'record') {
     result = await desktopStartRecording();
+  } else if (normalized === 'stop recording' || normalized === 'end recording') {
+    result = await desktopStopRecording();
   } else if (normalized === 'start streaming' || normalized === 'start stream' || normalized === 'go live') {
     result = await desktopStartStreaming();
-  } else if (normalized === 'mute mic' || normalized === 'mute my mic' || normalized === 'mute') {
+  } else if (normalized === 'stop streaming' || normalized === 'stop stream' || normalized === 'end stream') {
+    result = await desktopStopStreaming();
+  } else if (normalized === 'mute microphone' || normalized === 'mute mic' || normalized === 'mute my mic' || normalized === 'mute') {
     result = await desktopSetMute('mic', true);
-  } else if (normalized === 'unmute mic' || normalized === 'unmute my mic' || normalized === 'unmute') {
+  } else if (normalized === 'unmute microphone' || normalized === 'unmute mic' || normalized === 'unmute my mic' || normalized === 'unmute') {
     result = await desktopSetMute('mic', false);
   } else if (normalized === 'take screenshot' || normalized === 'screenshot') {
     result = await desktopTakeScreenshot();
