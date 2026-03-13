@@ -852,7 +852,7 @@ class StreamVoiceEnhanced {
 
         const backendStatusValue = backendHealth.status || (this.serverReachable ? 'healthy' : 'degraded');
         const httpApiStatusValue = backendHealth.httpApi?.status || (this.serverReachable ? 'healthy' : 'error');
-        const webSocketStatusValue = backendHealth.webSocket?.status || (this.wsConnected ? 'healthy' : 'disconnected');
+        const webSocketStatusValue = backendHealth.webSocket?.status || (this.wsConnected ? 'healthy' : 'inactive');
 
         setValue('backend-health', backendStatusValue, backendStatusValue);
         const backendDetails = document.getElementById('backend-health-details');
@@ -872,6 +872,12 @@ class StreamVoiceEnhanced {
         const wsClients = document.getElementById('ws-health-clients');
         if (wsClients) {
             wsClients.textContent = backendHealth.webSocket?.clients ?? 0;
+        }
+        const websocketHealth = document.getElementById('websocket-health');
+        if (websocketHealth?.nextElementSibling) {
+            websocketHealth.nextElementSibling.textContent = webSocketStatusValue === 'inactive'
+                ? 'Legacy internal transport not used in desktop mode'
+                : `Port: 8090, Clients: ${backendHealth.webSocket?.clients ?? 0}`;
         }
 
         setValue('obs-health', obsHealth.status || 'unknown', obsHealth.status || 'unknown');
@@ -907,7 +913,7 @@ class StreamVoiceEnhanced {
             if (health.backend?.webSocket?.status === 'healthy') {
                 parts.push(`WS: ✓ (${health.backend.webSocket.clients} clients)`);
             } else {
-                parts.push('WS: ✗');
+                parts.push('Legacy WS: inactive');
             }
 
             if (health.obs?.status === 'connected') {
@@ -972,9 +978,9 @@ class StreamVoiceEnhanced {
         if (this.hasDesktopBridge) {
             this.displayCommandCategories({
                 scenes: ['switch to gameplay', 'switch to starting', 'switch to break'],
-                recording: ['start recording'],
-                streaming: ['start streaming'],
-                audio: ['mute mic', 'unmute mic'],
+                recording: ['start recording', 'stop recording', 'stop the record'],
+                streaming: ['start streaming', 'stop stream'],
+                audio: ['mute mic', 'unmute mic', 'turn up the mic', 'turn down the mic', 'turn up desktop', 'turn down desktop'],
                 macros: ['stream starting setup', 'stream ending setup', 'emergency mute', 'raid mode', 'subscriber celebration'],
                 other: ['take screenshot']
             });
@@ -1086,6 +1092,8 @@ class StreamVoiceEnhanced {
             case 'healthy':
             case 'connected':
                 return '#2ecc71';
+            case 'inactive':
+                return '#8ab4ff';
             case 'permission_denied':
             case 'degraded':
                 return '#f39c12';

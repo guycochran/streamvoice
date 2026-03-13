@@ -945,7 +945,7 @@ function getDesktopHealthStatus() {
   const startTime = app.getAppMetrics?.()[0]?.creationTime || Date.now();
   const speechState = speechService.getState();
   const httpApiStatus = 'healthy';
-  const webSocketStatus = 'disconnected';
+  const webSocketStatus = 'inactive';
   const backendStatus = httpApiStatus === 'healthy' ? 'healthy' : 'degraded';
 
   return {
@@ -1086,6 +1086,14 @@ function extractDesktopCommand(transcript) {
     return `desktop volume ${desktopVolumeMatch[1]} percent`;
   }
 
+  if (/\b(turn|move|bring)\s+(up|down)\s+(the\s+)?mic\b/.test(activeTranscript)) {
+    return activeTranscript.includes('down') ? 'mic volume down step' : 'mic volume up step';
+  }
+
+  if (/\b(turn|move|bring)\s+(up|down)\s+(the\s+)?desktop\b/.test(activeTranscript)) {
+    return activeTranscript.includes('down') ? 'desktop volume down step' : 'desktop volume up step';
+  }
+
   if (appSettings.speechGameMode) {
     if (activeTranscript === 'live' || activeTranscript === 'go' || activeTranscript === 'stream') return 'start stream';
     if (activeTranscript === 'stop') return 'stop stream';
@@ -1104,7 +1112,7 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('start streaming') || includesPhrase('start the stream') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
   if (includesPhrase('stop streaming') || includesPhrase('stop the stream') || includesPhrase('stop stream') || includesPhrase('end the stream') || includesPhrase('end stream')) return 'stop stream';
   if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) return 'record';
-  if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('end recording')) return 'stop recording';
+  if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('stop the record') || includesPhrase('end recording')) return 'stop recording';
   if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
   if (includesPhrase('unmute microphone') || includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
   if (includesPhrase('mute microphone') || includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
@@ -1273,6 +1281,34 @@ async function desktopSetVolume(target, percent) {
   };
 }
 
+async function desktopAdjustVolume(target, deltaPercent) {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const input = await findDesktopInput(target);
+  if (!input) {
+    throw new Error(`Audio source "${target}" not found`);
+  }
+
+  const volumeState = await desktopObs.call('GetInputVolume', {
+    inputName: input.inputName
+  });
+  const currentPercent = Math.round(Math.max(0, Math.min(1, Number(volumeState.inputVolumeMul ?? 0))) * 100);
+  const nextPercent = Math.max(0, Math.min(100, currentPercent + Number(deltaPercent)));
+  const volumeDb = nextPercent === 0 ? -100 : (nextPercent / 100 * 100) - 100;
+
+  await desktopObs.call('SetInputVolume', {
+    inputName: input.inputName,
+    inputVolumeDb: volumeDb
+  });
+
+  return {
+    success: true,
+    message: `${input.inputName} volume ${deltaPercent > 0 ? 'increased' : 'decreased'} to ${nextPercent}%`
+  };
+}
+
 async function desktopStartRecording() {
   const { outputActive } = await desktopObs.call('GetRecordStatus');
   if (outputActive) {
@@ -1330,6 +1366,14 @@ async function executeDesktopCommand(command) {
     result = await desktopSetVolume('mic', micVolumeMatch[1]);
   } else if (desktopVolumeMatch) {
     result = await desktopSetVolume('desktop', desktopVolumeMatch[1]);
+  } else if (normalized === 'mic volume up step') {
+    result = await desktopAdjustVolume('mic', 10);
+  } else if (normalized === 'mic volume down step') {
+    result = await desktopAdjustVolume('mic', -10);
+  } else if (normalized === 'desktop volume up step') {
+    result = await desktopAdjustVolume('desktop', 10);
+  } else if (normalized === 'desktop volume down step') {
+    result = await desktopAdjustVolume('desktop', -10);
   } else if (normalized === 'start recording' || normalized === 'record') {
     result = await desktopStartRecording();
   } else if (normalized === 'stop recording' || normalized === 'end recording') {
