@@ -1,28 +1,26 @@
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
-function resolveBundledFfmpegPath(appRoot) {
+function resolveBundledRecorderPath(appRoot) {
   const candidates = [
-    path.join(process.resourcesPath || '', 'ffmpeg', 'ffmpeg.exe'),
-    path.join(appRoot, 'vendor', 'ffmpeg', 'ffmpeg.exe'),
-    path.join(appRoot, 'vendor', 'ffmpeg', 'ffmpeg')
+    path.join(process.resourcesPath || '', 'native-recorder', 'StreamVoiceRecorder.exe'),
+    path.join(appRoot, 'vendor', 'native-recorder', 'StreamVoiceRecorder.exe')
   ];
 
   return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
 }
 
 class NativeSpeechCaptureService {
-  constructor({ appRoot, speechCaptureDir, ffmpegPath }) {
+  constructor({ appRoot, speechCaptureDir, recorderPath }) {
     this.appRoot = appRoot;
     this.speechCaptureDir = speechCaptureDir;
-    this.ffmpegPath = ffmpegPath || resolveBundledFfmpegPath(appRoot) || (process.platform !== 'win32' ? 'ffmpeg' : null);
+    this.recorderPath = recorderPath || resolveBundledRecorderPath(appRoot);
     this.activeRecording = null;
   }
 
   isSupported() {
-    return process.platform === 'win32' && Boolean(this.ffmpegPath);
+    return process.platform === 'win32' && Boolean(this.recorderPath);
   }
 
   buildRecordingFilePath() {
@@ -30,7 +28,7 @@ class NativeSpeechCaptureService {
     return path.join(this.speechCaptureDir, `native-utterance-${timestamp}.wav`);
   }
 
-  async startRecording({ deviceLabel } = {}) {
+  async startRecording({ deviceId, deviceLabel } = {}) {
     if (!this.isSupported()) {
       throw new Error('Native speech capture is not available on this platform');
     }
@@ -40,55 +38,70 @@ class NativeSpeechCaptureService {
     }
 
     const outputPath = this.buildRecordingFilePath();
-    const deviceInput = deviceLabel ? `audio=${deviceLabel}` : 'audio=default';
     const args = [
-      '-hide_banner',
-      '-loglevel', 'error',
-      '-f', 'dshow',
-      '-i', deviceInput,
-      '-ac', '1',
-      '-ar', '16000',
-      '-c:a', 'pcm_s16le',
-      '-y',
-      outputPath
+      '--output', outputPath
     ];
 
-    const child = spawn(this.ffmpegPath, args, {
+    if (deviceId) {
+      args.push('--device-id', deviceId);
+    }
+
+    if (deviceLabel) {
+      args.push('--device-label', deviceLabel);
+    }
+
+    const child = spawn(this.recorderPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true
     });
 
-    let stderr = '';
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.stdout.on('data', () => {});
-
-    this.activeRecording = {
+    const recording = {
       child,
       outputPath,
       startedAt: Date.now(),
-      deviceLabel: deviceLabel || 'default',
-      stderr
+      deviceId: deviceId || '',
+      deviceLabel: deviceLabel || '',
+      stderr: '',
+      stdout: ''
     };
 
-    child.stderr.on('data', (chunk) => {
-      if (this.activeRecording && this.activeRecording.child === child) {
-        this.activeRecording.stderr += chunk.toString();
-      }
+    this.activeRecording = recording;
+
+    child.stdout.on('data', (chunk) => {
+      recording.stdout += chunk.toString();
     });
 
-    child.on('exit', (code) => {
-      if (this.activeRecording && this.activeRecording.child === child) {
-        this.activeRecording.exitCode = code;
-      }
+    child.stderr.on('data', (chunk) => {
+      recording.stderr += chunk.toString();
+    });
+
+    await new Promise((resolve, reject) => {
+      const onError = (error) => reject(error);
+      const onExit = (code) => reject(new Error(`Recorder exited before ready with code ${code}`));
+      const onStdout = (chunk) => {
+        const text = chunk.toString();
+        if (text.includes('READY')) {
+          cleanup();
+          resolve();
+        }
+      };
+
+      const cleanup = () => {
+        child.off('error', onError);
+        child.off('exit', onExit);
+        child.stdout.off('data', onStdout);
+      };
+
+      child.once('error', onError);
+      child.once('exit', onExit);
+      child.stdout.on('data', onStdout);
     });
 
     return {
       outputPath,
-      startedAt: this.activeRecording.startedAt,
-      deviceLabel: this.activeRecording.deviceLabel
+      startedAt: recording.startedAt,
+      deviceId: recording.deviceId,
+      deviceLabel: recording.deviceLabel
     };
   }
 
@@ -100,7 +113,7 @@ class NativeSpeechCaptureService {
     const recording = this.activeRecording;
     this.activeRecording = null;
 
-    const { child, outputPath, startedAt, deviceLabel } = recording;
+    const { child, outputPath, startedAt, deviceLabel, stderr } = recording;
 
     const exitCode = await new Promise((resolve, reject) => {
       let settled = false;
@@ -120,34 +133,23 @@ class NativeSpeechCaptureService {
       child.once('exit', (code) => finish(code));
 
       try {
-        child.stdin.write('q\n');
+        child.stdin.write('STOP\n');
       } catch (_error) {
         try {
-          child.kill('SIGINT');
+          child.kill();
         } catch (killError) {
           finish(killError, true);
         }
       }
-
-      setTimeout(() => {
-        try {
-          child.kill('SIGKILL');
-        } catch (_error) {
-          // ignore
-        }
-      }, 5000);
     });
 
-    let fileStats = null;
-    if (fs.existsSync(outputPath)) {
-      fileStats = await fs.promises.stat(outputPath);
-    }
+    const fileStats = fs.existsSync(outputPath) ? await fs.promises.stat(outputPath) : null;
 
     return {
       filePath: outputPath,
       durationMs: Date.now() - startedAt,
       exitCode,
-      stderr: recording.stderr || '',
+      stderr,
       deviceLabel,
       byteLength: fileStats?.size || 0
     };
@@ -156,5 +158,5 @@ class NativeSpeechCaptureService {
 
 module.exports = {
   NativeSpeechCaptureService,
-  resolveBundledFfmpegPath
+  resolveBundledRecorderPath
 };

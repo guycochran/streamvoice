@@ -38,9 +38,11 @@ jobs:
       working-directory: electron-app
       run: npm run prepare-whisper
 
-    - name: Prepare ffmpeg assets
-      working-directory: electron-app
-      run: npm run prepare-ffmpeg
+    - name: Build native recorder
+      working-directory: electron-app/native-recorder
+      run: |
+        dotnet restore
+        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ../vendor/native-recorder
 
     - name: Build Windows installer
       working-directory: electron-app
