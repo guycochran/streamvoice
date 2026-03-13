@@ -54,7 +54,8 @@ Renderer role:
 2. command alias coverage
 3. hotkey UX polish
 4. diagnostics wording cleanup
-5. optional wake-word mode later
+5. macOS recorder sidecar
+6. optional wake-word mode later
 
 ## Wake Word Direction
 
