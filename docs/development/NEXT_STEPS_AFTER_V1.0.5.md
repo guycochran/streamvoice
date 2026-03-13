@@ -60,6 +60,17 @@
 - User-specific language training
 - Priority: P1
 
+#### SV-017: Push-To-Talk Hotkey
+- Let users assign a keyboard shortcut to invoke the mic during gameplay
+- Keep the same listening/transcribing/result UI when triggered by hotkey
+- Priority: P1
+
+#### SV-018: Scene And Target Mapping UI
+- Show the real OBS scenes/sources so the user can pick targets from a list
+- Replace hardcoded labels like `Raid` and `Gameplay` with user-defined mappings
+- Support setups like `Camera 1`, `Camera 2`, `Camera 3`, `Camera 4`, `PowerPoint`, and `Browser`
+- Priority: P1
+
 ## 🐛 Known Issues to Address
 
 1. **GitHub Actions Build**

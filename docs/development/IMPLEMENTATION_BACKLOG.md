@@ -218,9 +218,34 @@ This backlog translates the product analysis and roadmap into concrete execution
     - clip/highlight workflow
     - end stream routine
 
+### SV-017: Push-To-Talk Hotkey
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - users can trigger voice capture from a keyboard shortcut during gameplay
+- Acceptance criteria:
+  - user can assign a global or app-level hotkey for push-to-talk
+  - hotkey assignment is editable in settings
+  - hotkey works without clicking the on-screen mic button
+  - the UI still shows listening, transcribing, transcript, and result states when invoked by hotkey
+  - conflicts or unsupported shortcuts are reported clearly
+
+### SV-018: Scene And Target Mapping UI
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - users can map StreamVoice actions to their real OBS scenes and sources instead of relying on default names like `raid` or `gameplay`
+- Acceptance criteria:
+  - app can query and display the current OBS scene list when connected
+  - user can choose scenes/targets from a visible picker or dropdown
+  - built-in actions like `Raid Mode`, `Start Stream`, and scene switches use the saved mapping
+  - mappings support non-stream scenes such as cameras, browser, and presentation layouts
+  - mappings persist across restarts
+  - diagnostics show whether scene discovery succeeded
+
 ## P1: Product Validation
 
-### SV-017: Real User Test Plan
+### SV-019: Real User Test Plan
 - Priority: `P1`
 - Target version: `v1.1.0`
 - Outcome:
@@ -229,7 +254,7 @@ This backlog translates the product analysis and roadmap into concrete execution
   - at least 3 real users run guided tests
   - issues categorized by setup, reliability, latency, and clarity
 
-### SV-018: Operator Confidence Survey
+### SV-020: Operator Confidence Survey
 - Priority: `P1`
 - Target version: `v1.2.0`
 - Outcome:
@@ -243,7 +268,7 @@ This backlog translates the product analysis and roadmap into concrete execution
 
 ## P2: Platform And Expansion
 
-### SV-019: Internal State Model Refactor
+### SV-021: Internal State Model Refactor
 - Priority: `P2`
 - Target version: `v2.0.0`
 - Outcome:
@@ -252,7 +277,7 @@ This backlog translates the product analysis and roadmap into concrete execution
   - app state is modeled explicitly
   - transport and UI state are not inferred indirectly from each other
 
-### SV-020: Integration Architecture
+### SV-022: Integration Architecture
 - Priority: `P2`
 - Target version: `v2.0.0`
 - Outcome:
