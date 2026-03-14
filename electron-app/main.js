@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.10',
+          message: 'StreamVoice v1.1.0-beta.11',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1076,6 +1076,15 @@ function normalizeGameModeTranscript(transcript) {
     .trim();
 }
 
+function normalizeCameraNumberWords(value) {
+  return String(value || '')
+    .replace(/\btoo\b/g, 'two')
+    .replace(/\bwon\b/g, 'one')
+    .replace(/\btree\b/g, 'three')
+    .replace(/\bfore\b/g, 'four')
+    .trim();
+}
+
 const LOW_SIGNAL_TRANSCRIPTS = new Set([
   'you',
   'thank you',
@@ -1154,8 +1163,9 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('mute the microphone') || includesPhrase('mute the mic')) return 'mute';
   if (includesPhrase('mute microphone') || includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
 
-  if (normalized.includes('switch to ')) {
-    const target = normalized.split('switch to ')[1]?.trim();
+  const switchMatch = activeTranscript.match(/\bswitch\s+(?:to\s+)?(?:the\s+)?(.+)$/);
+  if (switchMatch) {
+    const target = normalizeCameraNumberWords(switchMatch[1]?.trim());
     if (target) {
       return `switch to ${target}`;
     }
