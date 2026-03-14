@@ -691,6 +691,18 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
       const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
 
       if (normalizedTranscript) {
+        const extractedCommand = extractDesktopCommand(normalizedTranscript);
+        if (!extractedCommand) {
+          speechService.logEvent('whisper-noncommand', {
+            attempt: attemptCount,
+            model: attempt.modelPreference,
+            audioPath: attempt.audioPath,
+            transcript: normalizedTranscript,
+            fallbackUsed: attemptCount > 1
+          });
+          continue;
+        }
+
         return {
           whisperResult: lastWhisperResult,
           normalizedTranscript,
