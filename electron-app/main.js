@@ -1242,15 +1242,33 @@ function getSceneAliases(targetScene) {
   return aliasMap[key] || [targetScene];
 }
 
+function getStrictSceneTokenRules(targetScene) {
+  const key = normalizeDesktopName(targetScene);
+  const strictTokenMap = {
+    camera1: ['1', 'one'],
+    camera2: ['2', 'two'],
+    camera3: ['3', 'three'],
+    camera4: ['4', 'four']
+  };
+
+  return strictTokenMap[key] || null;
+}
+
 function findBestSceneMatch(scenes, targetScene) {
   const aliases = getSceneAliases(targetScene);
   const normalizedAliases = aliases.map(normalizeDesktopName).filter(Boolean);
   const aliasTokenSets = aliases.map(tokenizeDesktopName).filter((tokens) => tokens.length > 0);
+  const strictTokens = getStrictSceneTokenRules(targetScene);
   let bestMatch = null;
 
   scenes.forEach((scene) => {
     const normalizedScene = normalizeDesktopName(scene);
     const sceneTokens = tokenizeDesktopName(scene);
+
+    if (strictTokens && !strictTokens.some((token) => sceneTokens.includes(token) || normalizedScene.includes(token))) {
+      return;
+    }
+
     let score = 0;
 
     normalizedAliases.forEach((alias) => {
