@@ -57,6 +57,7 @@ This stage is about creating strong day-to-day value.
 - ship reusable templates
 - add structured profile/mapping support for scenes, sources, aliases, and workflows
 - add scene aliases so names like `PiP`, `Camera 1`, `Browser`, and `PowerPoint` are easy to invoke by voice
+- add Studio Mode workflows so professional users can `preview` scenes and `cut` them live
 - add source and browser-source toggles for streamer overlays such as chat, webcam, lower thirds, and alerts
 - add common streamer workflows:
   - start stream
@@ -205,6 +206,11 @@ These should become the product’s headline capabilities.
    - hide chat
    - toggle webcam
    - toggle PiP / browser overlay
+
+7. Studio Mode Workflow
+   - preview camera / slides / break
+   - cut preview to program
+   - optional fade / auto transition
 
 ## Success Metrics
 If StreamVoice is going to become a serious product, these metrics matter more than raw download count.

@@ -383,6 +383,31 @@ This backlog translates the product analysis and roadmap into concrete execution
     - execution result
   - ambiguity or parse failures are visible to users and testers
 
+### SV-028: Studio Mode Preview / Program Support
+- Priority: `P1`
+- Target version: `v1.3.0`
+- Outcome:
+  - StreamVoice supports a switcher-style Preview/Program workflow for OBS Studio Mode
+- Acceptance criteria:
+  - app detects whether OBS Studio Mode is enabled
+  - app can show current preview and program scene names
+  - voice command `preview <scene>` sends the mapped scene to preview
+  - voice command `cut` transitions preview to program
+  - failures are clear if Studio Mode is unavailable or disabled
+
+### SV-029: Studio Mode HUD And Transition Controls
+- Priority: `P1`
+- Target version: `v1.3.0`
+- Outcome:
+  - operators can see and control preview/program state clearly
+- Acceptance criteria:
+  - UI shows preview scene and program scene
+  - diagnostics show whether Studio Mode is active
+  - app supports at least:
+    - `cut`
+    - optional `fade` or `auto`
+  - settings can store a preferred transition mode
+
 ## P1: Product Validation
 
 ### SV-019: Real User Test Plan
