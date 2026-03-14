@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.15',
+          message: 'StreamVoice v1.1.0-beta.16',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1360,6 +1360,20 @@ function parseSceneSwitchCommand(transcript) {
   return '';
 }
 
+function parseScenePreviewCommand(transcript) {
+  const match = transcript.match(/\bpreview\b\s+(.+)$/);
+  if (!match) {
+    return '';
+  }
+
+  const target = resolveSceneCommandTarget(match[1]);
+  if (!target) {
+    return '';
+  }
+
+  return `preview ${target}`;
+}
+
 function parseDirectSceneReference(transcript) {
   const knownScenes = Array.isArray(desktopObsState.scenes) ? desktopObsState.scenes : [];
   for (const sceneName of knownScenes) {
@@ -1522,6 +1536,17 @@ function parseDesktopIntent(transcript) {
       intent: 'switch_scene',
       appliedCorrections: correctionResult.appliedCorrections,
       safetyDecision: 'safe_explicit_camera_slot'
+    };
+  }
+
+  const previewCommand = parseScenePreviewCommand(activeTranscript);
+  if (previewCommand) {
+    return {
+      transcript: activeTranscript,
+      command: previewCommand,
+      intent: 'preview_scene',
+      appliedCorrections: correctionResult.appliedCorrections,
+      safetyDecision: 'safe_scene_preview'
     };
   }
 
@@ -1691,7 +1716,11 @@ async function desktopSwitchToScene(targetScene) {
 
   const { scenes } = await getDesktopSceneState();
   const requestedTarget = resolveMappedScene(targetScene);
-  const sceneName = findBestSceneMatch(scenes, requestedTarget);
+  const exactAliasMatches = getSceneAliases(requestedTarget)
+    .map((alias) => normalizeSceneTargetWords(alias))
+    .filter(Boolean);
+  const exactSceneName = scenes.find((scene) => exactAliasMatches.includes(normalizeSceneTargetWords(scene)));
+  const sceneName = exactSceneName || findBestSceneMatch(scenes, requestedTarget);
 
   if (!sceneName) {
     throw new Error(`Scene "${requestedTarget}" not found`);
@@ -1704,6 +1733,33 @@ async function desktopSwitchToScene(targetScene) {
   }
   broadcastDesktopStatus();
   return { success: true, message: `Switched to ${sceneName}` };
+}
+
+async function desktopPreviewScene(targetScene) {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const studioMode = await desktopObs.call('GetStudioModeEnabled').catch(() => ({ studioModeEnabled: false }));
+  if (!studioMode?.studioModeEnabled) {
+    return { success: false, message: 'Studio Mode is not enabled in OBS' };
+  }
+
+  const { scenes } = await getDesktopSceneState();
+  const requestedTarget = resolveMappedScene(targetScene);
+  const exactAliasMatches = getSceneAliases(requestedTarget)
+    .map((alias) => normalizeSceneTargetWords(alias))
+    .filter(Boolean);
+  const sceneName = scenes.find((scene) => exactAliasMatches.includes(normalizeSceneTargetWords(scene)))
+    || findBestSceneMatch(scenes, requestedTarget);
+
+  if (!sceneName) {
+    throw new Error(`Scene "${requestedTarget}" not found`);
+  }
+
+  await desktopObs.call('SetCurrentPreviewScene', { sceneName });
+  broadcastDesktopStatus();
+  return { success: true, message: `Previewing ${sceneName}` };
 }
 
 async function desktopSetMute(target, muted) {
@@ -1869,6 +1925,8 @@ async function executeDesktopCommand(command) {
 
   if (normalized.startsWith('switch to ')) {
     result = await desktopSwitchToScene(normalized.replace(/^switch to\s+/, ''));
+  } else if (normalized.startsWith('preview ')) {
+    result = await desktopPreviewScene(normalized.replace(/^preview\s+/, ''));
   } else if (micVolumeMatch) {
     result = await desktopSetVolume('mic', micVolumeMatch[1]);
   } else if (desktopVolumeMatch) {

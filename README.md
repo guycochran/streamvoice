@@ -16,7 +16,7 @@ Working in packaged Windows builds:
 - workflow profiles for basic live control and studio-style operation
 
 Current app version in repo:
-- `1.1.0-beta.15`
+- `1.1.0-beta.16`
 
 For a concise engineering snapshot, start with [docs/development/CURRENT_STATE.md](docs/development/CURRENT_STATE.md).
 
