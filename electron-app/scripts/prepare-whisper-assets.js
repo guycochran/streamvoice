@@ -21,6 +21,7 @@ const appRoot = path.resolve(__dirname, '..');
 const vendorRoot = path.join(appRoot, 'vendor', 'whisper');
 const vendorModelDir = path.join(vendorRoot, 'models');
 const vendorBinaryPath = path.join(vendorRoot, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
+const vendorCompatBinaryPath = path.join(vendorRoot, process.platform === 'win32' ? 'whisper-cli-compat.exe' : 'whisper-cli-compat');
 const cacheRoot = path.join(appRoot, '.cache', 'whisper');
 
 function run(command, args, options = {}) {
@@ -77,11 +78,12 @@ async function extractZip(zipPath, destination) {
   await run('unzip', ['-oq', zipPath, '-d', destination]);
 }
 
-async function buildWhisperCli() {
+async function buildWhisperCli({ compatibility = false } = {}) {
   const zipPath = path.join(cacheRoot, `${WHISPER_VERSION}.zip`);
   const sourceRoot = path.join(cacheRoot, `src-${WHISPER_VERSION}`);
   const extractedDir = path.join(sourceRoot, `whisper.cpp-${WHISPER_VERSION.replace(/^v/, '')}`);
-  const buildDir = path.join(cacheRoot, `build-${WHISPER_VERSION}`);
+  const buildDir = path.join(cacheRoot, `build-${WHISPER_VERSION}${compatibility ? '-compat' : ''}`);
+  const outputBinaryPath = compatibility ? vendorCompatBinaryPath : vendorBinaryPath;
 
   await ensureDir(cacheRoot);
 
@@ -97,21 +99,23 @@ async function buildWhisperCli() {
 
   await fsp.rm(buildDir, { recursive: true, force: true });
 
-  console.log('Configuring whisper.cpp build...');
+  console.log(`Configuring whisper.cpp build${compatibility ? ' (compatibility)' : ''}...`);
   const cmakeArgs = ['-S', extractedDir, '-B', buildDir, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF'];
   if (process.platform === 'win32') {
-    cmakeArgs.push(
-      '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded',
-      '-DGGML_NATIVE=OFF',
-      '-DGGML_AVX=OFF',
-      '-DGGML_AVX2=OFF',
-      '-DGGML_FMA=OFF',
-      '-DGGML_F16C=OFF'
-    );
+    cmakeArgs.push('-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded');
+    if (compatibility) {
+      cmakeArgs.push(
+        '-DGGML_NATIVE=OFF',
+        '-DGGML_AVX=OFF',
+        '-DGGML_AVX2=OFF',
+        '-DGGML_FMA=OFF',
+        '-DGGML_F16C=OFF'
+      );
+    }
   }
   await run('cmake', cmakeArgs);
 
-  console.log('Building whisper-cli...');
+  console.log(`Building whisper-cli${compatibility ? ' (compatibility)' : ''}...`);
   await run('cmake', ['--build', buildDir, '--config', 'Release', '--target', 'whisper-cli']);
 
   const candidateBinaryPaths = [
@@ -127,7 +131,7 @@ async function buildWhisperCli() {
   }
 
   await ensureDir(vendorRoot);
-  await fsp.copyFile(builtBinaryPath, vendorBinaryPath);
+  await fsp.copyFile(builtBinaryPath, outputBinaryPath);
   const builtBinaryDir = path.dirname(builtBinaryPath);
   const builtArtifacts = await fsp.readdir(builtBinaryDir);
   for (const fileName of builtArtifacts) {
@@ -137,7 +141,7 @@ async function buildWhisperCli() {
     await fsp.copyFile(path.join(builtBinaryDir, fileName), path.join(vendorRoot, fileName));
   }
   if (process.platform !== 'win32') {
-    await fsp.chmod(vendorBinaryPath, 0o755);
+    await fsp.chmod(outputBinaryPath, 0o755);
   }
 }
 
@@ -163,8 +167,13 @@ async function main() {
     await buildWhisperCli();
   }
 
+  if (process.platform === 'win32' && !fs.existsSync(vendorCompatBinaryPath)) {
+    await buildWhisperCli({ compatibility: true });
+  }
+
   console.log(`Whisper assets ready:
   Binary: ${vendorBinaryPath}
+  Compat Binary: ${vendorCompatBinaryPath}
   Models: ${MODELS.map((model) => path.join(vendorModelDir, model.name)).join(', ')}`);
 }
 

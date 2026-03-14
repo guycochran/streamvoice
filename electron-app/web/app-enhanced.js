@@ -753,6 +753,7 @@ class StreamVoiceEnhanced {
                 `Last Preview Sequence: ${this.speechState?.lastPreviewSequence || 0}`,
                 `Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'}ms`,
                 `Last Whisper Model: ${this.speechState?.lastWhisperModel || 'unknown'}`,
+                `Last Whisper Binary: ${this.speechState?.lastWhisperBinaryPath || 'unknown'}`,
                 `Last Whisper Audio Path: ${this.speechState?.lastWhisperAudioPath || 'none'}`,
                 `Last Whisper Attempts: ${this.speechState?.lastWhisperAttemptCount ?? 0}`,
                 `Last Whisper Fallback: ${this.speechState?.lastWhisperFallbackUsed ? 'yes' : 'no'}`,
@@ -1422,6 +1423,7 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Capture Chunks: ${this.speechState?.lastCaptureChunkCount || 0}
   Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'} ms
   Last Whisper Model: ${this.speechState?.lastWhisperModel || 'unknown'}
+  Last Whisper Binary: ${this.speechState?.lastWhisperBinaryPath || 'unknown'}
   Last Whisper Audio Path: ${this.speechState?.lastWhisperAudioPath || 'none'}
   Last Whisper Attempts: ${this.speechState?.lastWhisperAttemptCount ?? 0}
   Last Whisper Fallback: ${this.speechState?.lastWhisperFallbackUsed ? 'yes' : 'no'}

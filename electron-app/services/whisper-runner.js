@@ -19,6 +19,20 @@ function buildCandidateModelPaths(modelFileName, { appRoot, userDataPath }) {
   ].filter(Boolean);
 }
 
+function buildCandidateBinaryPaths(fileNames, { appRoot }) {
+  const names = Array.isArray(fileNames) ? fileNames : [fileNames];
+  const candidates = [];
+  names.forEach((fileName) => {
+    candidates.push(
+      process.env.STREAMVOICE_WHISPER_BIN,
+      path.join(appRoot, 'vendor', 'whisper', fileName),
+      path.join(appRoot, 'bin', fileName),
+      path.join(process.resourcesPath || '', 'whisper', fileName)
+    );
+  });
+  return candidates.filter(Boolean);
+}
+
 function formatWhisperExit(code, stderr) {
   if (code === 3221225781) {
     return 'Whisper failed to start because a required Windows DLL/runtime is missing.';
@@ -39,17 +53,14 @@ function formatWhisperTimeout(stderr) {
 }
 
 function resolveWhisperConfig({ appRoot, userDataPath, modelPreference = 'base.en' }) {
-  const candidateBins = [
-    process.env.STREAMVOICE_WHISPER_BIN,
-    path.join(appRoot, 'vendor', 'whisper', 'whisper-cli'),
-    path.join(appRoot, 'vendor', 'whisper', 'whisper-cli.exe'),
-    path.join(appRoot, 'bin', 'whisper-cli'),
-    path.join(appRoot, 'bin', 'whisper-cli.exe'),
-    path.join(process.resourcesPath || '', 'whisper', 'whisper-cli.exe'),
-    path.join(process.resourcesPath || '', 'whisper', 'whisper-cli')
-  ].filter(Boolean);
-
-  const binaryPath = candidateBins.find(fileExists) || null;
+  const primaryBinaryPath = buildCandidateBinaryPaths(
+    process.platform === 'win32' ? ['whisper-cli.exe', 'whisper-cli'] : ['whisper-cli'],
+    { appRoot }
+  ).find(fileExists) || null;
+  const compatBinaryPath = buildCandidateBinaryPaths(
+    process.platform === 'win32' ? ['whisper-cli-compat.exe', 'whisper-cli-compat'] : ['whisper-cli-compat'],
+    { appRoot }
+  ).find(fileExists) || null;
   const preferredModelFile = modelPreference === 'tiny.en' ? 'ggml-tiny.en.bin' : 'ggml-base.en.bin';
   const fallbackModelFile = modelPreference === 'tiny.en' ? 'ggml-base.en.bin' : 'ggml-tiny.en.bin';
   const candidateModels = [
@@ -59,23 +70,14 @@ function resolveWhisperConfig({ appRoot, userDataPath, modelPreference = 'base.e
   const modelPath = candidateModels.find(fileExists) || null;
 
   return {
-    binaryPath,
+    binaryPath: primaryBinaryPath,
+    compatBinaryPath,
     modelPath,
     modelName: modelPath ? path.basename(modelPath, '.bin').replace(/^ggml-/, '') : null
   };
 }
 
-async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeoutMs = WHISPER_TIMEOUT_MS, modelPreference = 'base.en' }) {
-  const { binaryPath, modelPath, modelName } = resolveWhisperConfig({ appRoot, userDataPath, modelPreference });
-
-  if (!binaryPath) {
-    throw new Error('Whisper binary not found. Configure STREAMVOICE_WHISPER_BIN or bundle whisper-cli.');
-  }
-
-  if (!modelPath) {
-    throw new Error('Whisper model not found. Install ggml-base.en.bin into the configured model path.');
-  }
-
+function runWhisperProcess({ binaryPath, modelPath, modelName, audioPath, timeoutMs, modelPreference }) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const outputBase = path.join(os.tmpdir(), `streamvoice-whisper-${Date.now()}`);
@@ -131,7 +133,10 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeout
       clearTimeout(timeout);
 
       if (code !== 0) {
-        reject(new Error(formatWhisperExit(code, stderr)));
+        const error = new Error(formatWhisperExit(code, stderr));
+        error.code = code;
+        error.stderr = stderr.trim();
+        reject(error);
         return;
       }
 
@@ -161,6 +166,41 @@ async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeout
       });
     });
   });
+}
+
+async function transcribeWithWhisper({ audioPath, appRoot, userDataPath, timeoutMs = WHISPER_TIMEOUT_MS, modelPreference = 'base.en' }) {
+  const { binaryPath, compatBinaryPath, modelPath, modelName } = resolveWhisperConfig({ appRoot, userDataPath, modelPreference });
+
+  if (!binaryPath) {
+    throw new Error('Whisper binary not found. Configure STREAMVOICE_WHISPER_BIN or bundle whisper-cli.');
+  }
+
+  if (!modelPath) {
+    throw new Error('Whisper model not found. Install ggml-base.en.bin into the configured model path.');
+  }
+
+  try {
+    return await runWhisperProcess({
+      binaryPath,
+      modelPath,
+      modelName,
+      audioPath,
+      timeoutMs,
+      modelPreference
+    });
+  } catch (error) {
+    if (process.platform === 'win32' && error?.code === 3221225501 && compatBinaryPath && compatBinaryPath !== binaryPath) {
+      return await runWhisperProcess({
+        binaryPath: compatBinaryPath,
+        modelPath,
+        modelName,
+        audioPath,
+        timeoutMs,
+        modelPreference
+      });
+    }
+    throw error;
+  }
 }
 
 module.exports = {

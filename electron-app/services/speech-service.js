@@ -36,6 +36,7 @@ class SpeechService extends EventEmitter {
       lastWhisperStderr: '',
       lastWhisperAudioPath: null,
       lastWhisperModel: null,
+      lastWhisperBinaryPath: null,
       lastWhisperAttemptCount: 0,
       lastWhisperFallbackUsed: false,
       speechEvents: [],
@@ -174,6 +175,7 @@ class SpeechService extends EventEmitter {
       lastWhisperStderr: details.stderr || this.state.lastWhisperStderr,
       lastWhisperAudioPath: details.audioPath || this.state.lastWhisperAudioPath,
       lastWhisperModel: details.modelPreference || details.modelName || this.state.lastWhisperModel,
+      lastWhisperBinaryPath: details.binaryPath || this.state.lastWhisperBinaryPath,
       lastWhisperAttemptCount: details.attemptCount ?? this.state.lastWhisperAttemptCount,
       lastWhisperFallbackUsed: details.fallbackUsed ?? this.state.lastWhisperFallbackUsed
     });
