@@ -1064,6 +1064,21 @@ function normalizeGameModeTranscript(transcript) {
     .trim();
 }
 
+const LOW_SIGNAL_TRANSCRIPTS = new Set([
+  'you',
+  'thank you',
+  'thanks',
+  'thank',
+  'yeah',
+  'yes',
+  'yep',
+  'no',
+  'huh',
+  'uh',
+  'um',
+  'hmm'
+]);
+
 function extractDesktopCommand(transcript) {
   const normalized = normalizeSpeechTranscript(transcript);
   const gameNormalized = appSettings.speechGameMode ? normalizeGameModeTranscript(transcript) : normalized;
@@ -1075,6 +1090,10 @@ function extractDesktopCommand(transcript) {
 
   const compact = ` ${activeTranscript} `;
   const includesPhrase = (phrase) => compact.includes(` ${phrase} `);
+
+  if (LOW_SIGNAL_TRANSCRIPTS.has(activeTranscript)) {
+    return '';
+  }
 
   const micVolumeMatch = activeTranscript.match(/\bmic volume (\d+)\s*percent\b/);
   if (micVolumeMatch) {
@@ -1099,6 +1118,10 @@ function extractDesktopCommand(transcript) {
     if (activeTranscript === 'stop') return 'stop stream';
     if (activeTranscript === 'break' || activeTranscript === 'brb') return 'switch to break';
     if (activeTranscript === 'gameplay' || activeTranscript === 'game') return 'switch to gameplay';
+    if (activeTranscript === 'camera one' || activeTranscript === 'cam one' || activeTranscript === 'one' || activeTranscript === 'won') return 'switch to camera 1';
+    if (activeTranscript === 'camera two' || activeTranscript === 'cam two' || activeTranscript === 'two' || activeTranscript === 'too') return 'switch to camera 2';
+    if (activeTranscript === 'camera three' || activeTranscript === 'cam three' || activeTranscript === 'three' || activeTranscript === 'tree') return 'switch to camera 3';
+    if (activeTranscript === 'camera four' || activeTranscript === 'cam four' || activeTranscript === 'four' || activeTranscript === 'fore') return 'switch to camera 4';
     if (activeTranscript === 'raid') return 'raid mode';
     if (activeTranscript === 'record') return 'record';
     if (activeTranscript === 'screenshot' || activeTranscript === 'shot') return 'screenshot';
@@ -1114,7 +1137,9 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) return 'record';
   if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('stop the record') || includesPhrase('end recording')) return 'stop recording';
   if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
+  if (includesPhrase('unmute the microphone') || includesPhrase('unmute the mic')) return 'unmute';
   if (includesPhrase('unmute microphone') || includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
+  if (includesPhrase('mute the microphone') || includesPhrase('mute the mic')) return 'mute';
   if (includesPhrase('mute microphone') || includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
 
   if (normalized.includes('switch to ')) {
