@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.17',
+          message: 'StreamVoice v1.1.0-beta.18',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1929,17 +1929,12 @@ async function desktopCutTransition() {
 }
 
 async function desktopCutToScene(targetScene) {
-  const previewResult = await desktopPreviewScene(targetScene);
-  if (!previewResult?.success) {
-    return previewResult;
+  const switchResult = await desktopSwitchToScene(targetScene);
+  if (!switchResult?.success) {
+    return switchResult;
   }
 
-  const cutResult = await desktopCutTransition();
-  if (!cutResult?.success) {
-    return cutResult;
-  }
-
-  const targetLabel = previewResult.message?.replace(/^Previewing\s+/, '') || targetScene;
+  const targetLabel = switchResult.message?.replace(/^Switched to\s+/, '') || targetScene;
   return {
     success: true,
     message: `Cut to ${targetLabel}`
