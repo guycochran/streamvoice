@@ -508,10 +508,10 @@ class StreamVoiceEnhanced {
 
         const enabled = this.speechGameMode !== false;
         this.gameModeIndicator.classList.toggle('active', enabled);
-        this.gameModeLabel.textContent = enabled ? 'Game Mode' : 'Standard Mode';
+        this.gameModeLabel.textContent = enabled ? 'Low Latency' : 'Standard Mode';
         this.gameModeIndicator.title = enabled
-            ? 'Low-latency Game Mode is active'
-            : 'Game Mode is off';
+            ? 'Low Latency Mode is active'
+            : 'Standard voice mode is active';
     }
 
     startListening() {
@@ -977,11 +977,11 @@ class StreamVoiceEnhanced {
     async loadCommandCategories() {
         if (this.hasDesktopBridge) {
             this.displayCommandCategories({
-                scenes: ['switch to gameplay', 'switch to starting', 'switch to break'],
+                scenes: ['switch to gameplay', 'switch to starting', 'switch to break', 'switch to camera 1'],
                 recording: ['start recording', 'stop recording', 'stop the record'],
                 streaming: ['start streaming', 'stop stream'],
                 audio: ['mute mic', 'unmute mic', 'turn up the mic', 'turn down the mic', 'turn up desktop', 'turn down desktop'],
-                macros: ['stream starting setup', 'stream ending setup', 'emergency mute', 'raid mode', 'subscriber celebration'],
+                macros: ['stream starting setup', 'stream ending setup', 'emergency mute', 'switch to break', 'switch to camera 1'],
                 other: ['take screenshot']
             });
             return;

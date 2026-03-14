@@ -238,7 +238,7 @@
 
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('voice')">Voice Control</button>
-                <button class="tab" onclick="switchTab('macros')">Stream Deck</button>
+                <button class="tab" onclick="switchTab('macros')">Quick Actions</button>
                 <button class="tab" onclick="switchTab('commands')">All Commands</button>
                 <button class="tab" onclick="switchTab('audio')">Audio Mixer</button>
                 <button class="tab" onclick="switchTab('status')">OBS Status</button>
@@ -295,22 +295,22 @@
                 </div>
             </div>
 
-            <!-- Stream Deck Tab -->
+            <!-- Quick Actions Tab -->
             <div id="macros-tab" class="tab-content">
-                <h3>Stream Deck Macros</h3>
-                <p style="color: #666; margin-bottom: 20px;">One-click actions like a Stream Deck!</p>
+                <h3>Quick Actions</h3>
+                <p style="color: #666; margin-bottom: 20px;">One-click production actions for streamers, presenters, and live operators.</p>
                 <div class="macro-buttons">
                     <button class="macro-button" onclick="executeCommand('stream starting setup')">
-                        🚀 Start Stream
+                        🚀 Start Session
                     </button>
                     <button class="macro-button" onclick="executeCommand('stream ending setup')">
-                        🛑 End Stream
+                        🛑 End Session
                     </button>
-                    <button class="macro-button" onclick="executeCommand('raid mode')">
-                        🎯 Raid Mode
+                    <button class="macro-button" onclick="executeCommand('switch to break')">
+                        ⏸️ Switch to Break
                     </button>
-                    <button class="macro-button" onclick="executeCommand('subscriber celebration')">
-                        🎉 Sub Celebration
+                    <button class="macro-button" onclick="executeCommand('switch to camera 1')">
+                        🎥 Camera 1
                     </button>
                     <button class="macro-button" onclick="executeCommand('emergency mute')">
                         🚨 Emergency Mute
@@ -551,20 +551,20 @@
                             </select>
                         </div>
                         <div id="speech-command-model-status" style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
-                            Fast mode is recommended for quick voice commands during gameplay.
+                            Fast mode is recommended for quick voice commands during live production, streaming, and gameplay.
                         </div>
                     </div>
                 </div>
 
                 <div class="settings-section">
-                    <h4>Game Mode</h4>
+                    <h4>Low Latency Mode</h4>
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
                             <input type="checkbox" id="speech-game-mode" checked style="margin-right: 10px;">
-                            <span>Enable fast command snapping for gameplay</span>
+                            <span>Enable low-latency command snapping</span>
                         </label>
                         <div id="speech-game-mode-status" style="font-size: 13px; color: #b9c0d0;">
-                            Game mode favors short shouted commands like <code>mute</code>, <code>live</code>, <code>stop</code>, <code>break</code>, and <code>gameplay</code>.
+                            Low Latency Mode favors short, fast commands like <code>mute</code>, <code>live</code>, <code>stop</code>, <code>break</code>, and <code>camera one</code>.
                         </div>
                     </div>
                 </div>
@@ -589,7 +589,7 @@
                                 <select id="scene-mapping-brb" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
                             </div>
                             <div>
-                                <label for="scene-mapping-raid" style="display:block; margin-bottom: 5px; color: #9b59b6;">Raid Scene</label>
+                                <label for="scene-mapping-raid" style="display:block; margin-bottom: 5px; color: #9b59b6;">Focus Scene</label>
                                 <select id="scene-mapping-raid" class="scene-mapping-select" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;"></select>
                             </div>
                             <div>
