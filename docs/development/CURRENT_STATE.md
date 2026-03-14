@@ -5,7 +5,7 @@
 StreamVoice is now in the beta stabilization phase.
 
 Current app version in repo:
-- `1.1.0-beta.14`
+- `1.1.0-beta.15`
 
 Core promise now proven in packaged Windows builds:
 - native voice capture works
@@ -45,6 +45,7 @@ Renderer role:
 - configurable global voice hotkey
 - fast command mode with `tiny.en`
 - optional balanced mode with `base.en`
+- experimental Whisper runtime adapter with safe CLI fallback
 - workflow profiles:
   - `Basic Live Control`
   - `Studio Workflow`
@@ -61,6 +62,10 @@ Renderer role:
 6. beta tester readiness
 7. macOS recorder sidecar
 8. optional wake-word mode later
+
+Related design note:
+- see `VOICE_PRIOR_ART_NOTES.md` for reusable ideas from local vMix voice projects
+- see `WHISPER_NODE_ADDON_SPIKE.md` for the current runtime-upgrade evaluation path
 
 ## Beta Tester Readiness
 

@@ -570,6 +570,24 @@
                 </div>
 
                 <div class="settings-section">
+                    <h4>Speech Runtime</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label for="speech-runtime" style="display: block; margin-bottom: 5px; color: #9b59b6;">Recognition Runtime:</label>
+                            <select id="speech-runtime" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;">
+                                <option value="cli">Stable CLI (recommended)</option>
+                                <option value="addon">Experimental Addon Auto-detect</option>
+                                <option value="addon-kutalia">Experimental Addon: Kutalia</option>
+                                <option value="addon-fugood">Experimental Addon: Fugood</option>
+                            </select>
+                        </div>
+                        <div id="speech-runtime-status" style="font-size: 13px; color: #b9c0d0;">
+                            Stable CLI is the current production path. Addon runtimes are for controlled comparison only and fall back automatically if unavailable.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h4>Low Latency Mode</h4>
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
@@ -612,6 +630,85 @@
                         </div>
                         <div id="scene-mapping-status" style="font-size: 13px; color: #b9c0d0; margin-top: 12px;">
                             Scene list will populate from the active OBS connection.
+                        </div>
+                        <div id="scene-mapping-warnings" style="font-size: 12px; color: #fbbf24; margin-top: 10px; white-space: pre-wrap;">
+                            Waiting for scene mapping analysis.
+                        </div>
+                        <div id="scene-mapping-readiness" style="font-size: 13px; color: #b9c0d0; margin-top: 10px; font-weight: 600;">
+                            Voice trust readiness: checking...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>Voice Dictionary</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <p style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
+                            Teach StreamVoice your language. Add custom scene aliases, transcript corrections, and junk phrases to ignore.
+                        </p>
+                        <div style="margin-bottom: 18px;">
+                            <div style="font-size: 13px; color: #9b59b6; margin-bottom: 10px; font-weight: 600;">Priority Scene Slots</div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                                <div>
+                                    <label for="voice-slot-camera1" style="display:block; margin-bottom: 5px; color: #b9c0d0;">Camera 1 Aliases</label>
+                                    <input id="voice-slot-camera1" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="main cam, center camera">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-camera2" style="display:block; margin-bottom: 5px; color: #b9c0d0;">Camera 2 Aliases</label>
+                                    <input id="voice-slot-camera2" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="side cam, guest camera">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-camera3" style="display:block; margin-bottom: 5px; color: #b9c0d0;">Camera 3 Aliases</label>
+                                    <input id="voice-slot-camera3" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="wide shot, room cam">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-camera4" style="display:block; margin-bottom: 5px; color: #b9c0d0;">Camera 4 Aliases</label>
+                                    <input id="voice-slot-camera4" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="overhead, podium cam">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-powerpoint" style="display:block; margin-bottom: 5px; color: #b9c0d0;">PowerPoint Aliases</label>
+                                    <input id="voice-slot-powerpoint" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="slides, deck, presentation">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-browser" style="display:block; margin-bottom: 5px; color: #b9c0d0;">Browser Aliases</label>
+                                    <input id="voice-slot-browser" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="web, website">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-pip" style="display:block; margin-bottom: 5px; color: #b9c0d0;">PiP Aliases</label>
+                                    <input id="voice-slot-pip" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="picture in picture, inset">
+                                </div>
+                                <div>
+                                    <label for="voice-slot-brb" style="display:block; margin-bottom: 5px; color: #b9c0d0;">Break Aliases</label>
+                                    <input id="voice-slot-brb" type="text" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;" placeholder="intermission, break screen">
+                                </div>
+                            </div>
+                            <div style="font-size: 12px; color: #b9c0d0; margin-top: 8px;">
+                                Use comma-separated aliases. These slots are the most important trust targets for voice switching.
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label for="voice-scene-aliases" style="display:block; margin-bottom: 5px; color: #9b59b6;">Scene Aliases</label>
+                            <textarea id="voice-scene-aliases" rows="7" style="width: 100%; padding: 10px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827; font-family: monospace;" placeholder="camera1: main cam, center camera&#10;powerpoint: slides, deck&#10;pip: picture in picture"></textarea>
+                            <div style="font-size: 12px; color: #b9c0d0; margin-top: 6px;">
+                                One slot per line using <code>slot: alias one, alias two</code>.
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label for="voice-text-corrections" style="display:block; margin-bottom: 5px; color: #9b59b6;">Transcript Corrections</label>
+                            <textarea id="voice-text-corrections" rows="6" style="width: 100%; padding: 10px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827; font-family: monospace;" placeholder="power point => powerpoint&#10;and mute => unmute"></textarea>
+                            <div style="font-size: 12px; color: #b9c0d0; margin-top: 6px;">
+                                One correction per line using <code>heard =&gt; wanted</code>.
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label for="voice-ignored-transcripts" style="display:block; margin-bottom: 5px; color: #9b59b6;">Ignored Junk Phrases</label>
+                            <textarea id="voice-ignored-transcripts" rows="4" style="width: 100%; padding: 10px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827; font-family: monospace;" placeholder="thank you&#10;you&#10;yeah"></textarea>
+                            <div style="font-size: 12px; color: #b9c0d0; margin-top: 6px;">
+                                One phrase per line. These will be ignored before command execution.
+                            </div>
+                        </div>
+                        <div id="voice-dictionary-status" style="font-size: 13px; color: #b9c0d0;">
+                            Save the dictionary with the rest of your app preferences.
                         </div>
                     </div>
                 </div>
@@ -874,6 +971,8 @@
         function refreshSceneMappingOptions(sceneMappings = {}) {
             const sceneNames = window.streamVoice?.obsScenes || [];
             const status = document.getElementById('scene-mapping-status');
+            const warnings = document.getElementById('scene-mapping-warnings');
+            const readiness = document.getElementById('scene-mapping-readiness');
             const mappingKeys = ['starting', 'ending', 'brb', 'raid', 'gameplay'];
 
             mappingKeys.forEach((key) => {
@@ -909,6 +1008,179 @@
             status.textContent = sceneNames.length
                 ? `Loaded ${sceneNames.length} OBS scene(s).`
                 : 'Scene list not available yet. Connect to OBS and refresh the status tab.';
+
+            if (warnings) {
+                const warningLines = [];
+                const currentMappings = sceneMappings && Object.keys(sceneMappings).length
+                    ? sceneMappings
+                    : {
+                        starting: document.getElementById('scene-mapping-starting')?.value || '',
+                        ending: document.getElementById('scene-mapping-ending')?.value || '',
+                        brb: document.getElementById('scene-mapping-brb')?.value || '',
+                        raid: document.getElementById('scene-mapping-raid')?.value || '',
+                        gameplay: document.getElementById('scene-mapping-gameplay')?.value || ''
+                    };
+
+                if (!currentMappings.brb) {
+                    warningLines.push('Break slot is still using auto-detect. Confirm it before live use.');
+                }
+                if (!currentMappings.gameplay) {
+                    warningLines.push('Gameplay slot is still using auto-detect. Confirm it before live use.');
+                }
+
+                const priorityAliasKeys = ['camera1', 'camera2', 'camera3', 'camera4', 'powerpoint', 'browser', 'pip'];
+                const missingPriorityAliases = priorityAliasKeys.filter((key) => {
+                    const input = document.getElementById(`voice-slot-${key}`);
+                    return !input || !String(input.value || '').trim();
+                });
+                const missingCameraAliases = missingPriorityAliases.filter((key) => key.startsWith('camera'));
+                const missingPresentationAliases = missingPriorityAliases.filter((key) => !key.startsWith('camera'));
+
+                if (missingCameraAliases.length > 0) {
+                    warningLines.push(`Camera slot aliases missing for: ${missingCameraAliases.join(', ')}.`);
+                }
+                if (missingPresentationAliases.length > 0) {
+                    warningLines.push(`Presentation/overlay aliases missing for: ${missingPresentationAliases.join(', ')}.`);
+                }
+
+                warnings.textContent = warningLines.length
+                    ? warningLines.join('\n')
+                    : 'High-risk scene slots look configured for live use.';
+                warnings.style.color = warningLines.length ? '#fbbf24' : '#4ade80';
+
+                if (readiness) {
+                    const warningCount = warningLines.length;
+                    if (warningCount === 0) {
+                        readiness.textContent = 'Voice trust readiness: Ready for live use';
+                        readiness.style.color = '#4ade80';
+                    } else if (warningCount <= 2) {
+                        readiness.textContent = 'Voice trust readiness: Almost ready';
+                        readiness.style.color = '#fbbf24';
+                    } else {
+                        readiness.textContent = 'Voice trust readiness: Needs confirmation';
+                        readiness.style.color = '#f97316';
+                    }
+                }
+            }
+        }
+
+        function parseVoiceSceneAliases(rawValue) {
+            const aliasMap = {};
+            String(rawValue || '')
+                .split('\n')
+                .map(line => line.trim())
+                .filter(Boolean)
+                .forEach((line) => {
+                    const parts = line.split(':');
+                    if (parts.length < 2) {
+                        return;
+                    }
+
+                    const key = parts.shift().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const aliases = parts.join(':')
+                        .split(',')
+                        .map(value => value.trim())
+                        .filter(Boolean);
+
+                    if (key && aliases.length) {
+                        aliasMap[key] = aliases;
+                    }
+                });
+            return aliasMap;
+        }
+
+        function parseCommaAliases(rawValue) {
+            return String(rawValue || '')
+                .split(',')
+                .map(value => value.trim())
+                .filter(Boolean);
+        }
+
+        function getPrioritySlotAliases() {
+            const slotKeys = ['camera1', 'camera2', 'camera3', 'camera4', 'powerpoint', 'browser', 'pip', 'brb'];
+            const aliasMap = {};
+
+            slotKeys.forEach((key) => {
+                const input = document.getElementById(`voice-slot-${key}`);
+                const aliases = parseCommaAliases(input?.value || '');
+                if (aliases.length) {
+                    aliasMap[key] = aliases;
+                }
+            });
+
+            return aliasMap;
+        }
+
+        function applyPrioritySlotAliases(sceneAliases = {}) {
+            const slotKeys = ['camera1', 'camera2', 'camera3', 'camera4', 'powerpoint', 'browser', 'pip', 'brb'];
+            slotKeys.forEach((key) => {
+                const input = document.getElementById(`voice-slot-${key}`);
+                if (!input) {
+                    return;
+                }
+
+                const aliases = Array.isArray(sceneAliases[key]) ? sceneAliases[key] : [];
+                input.value = aliases.join(', ');
+            });
+        }
+
+        function mergeSceneAliases(...maps) {
+            const merged = {};
+
+            maps.forEach((map) => {
+                Object.entries(map || {}).forEach(([key, aliases]) => {
+                    if (!Array.isArray(aliases) || !aliases.length) {
+                        return;
+                    }
+
+                    merged[key] = Array.from(new Set([...(merged[key] || []), ...aliases]));
+                });
+            });
+
+            return merged;
+        }
+
+        function formatVoiceSceneAliases(sceneAliases = {}) {
+            return Object.entries(sceneAliases)
+                .filter(([, aliases]) => Array.isArray(aliases) && aliases.length)
+                .map(([key, aliases]) => `${key}: ${aliases.join(', ')}`)
+                .join('\n');
+        }
+
+        function parseVoiceTextCorrections(rawValue) {
+            return String(rawValue || '')
+                .split('\n')
+                .map(line => line.trim())
+                .filter(Boolean)
+                .map((line) => {
+                    const parts = line.split('=>');
+                    if (parts.length < 2) {
+                        return null;
+                    }
+
+                    const from = parts.shift().trim();
+                    const to = parts.join('=>').trim();
+                    if (!from || !to) {
+                        return null;
+                    }
+
+                    return { from, to };
+                })
+                .filter(Boolean);
+        }
+
+        function formatVoiceTextCorrections(corrections = []) {
+            return corrections
+                .filter((entry) => entry?.from && entry?.to)
+                .map((entry) => `${entry.from} => ${entry.to}`)
+                .join('\n');
+        }
+
+        function parseIgnoredTranscripts(rawValue) {
+            return String(rawValue || '')
+                .split('\n')
+                .map(line => line.trim())
+                .filter(Boolean);
         }
 
         async function saveAppPreferences() {
@@ -920,8 +1192,14 @@
             const hotkeyStatus = document.getElementById('voice-hotkey-status');
             const modelSelect = document.getElementById('speech-command-model');
             const modelStatus = document.getElementById('speech-command-model-status');
+            const runtimeSelect = document.getElementById('speech-runtime');
+            const runtimeStatus = document.getElementById('speech-runtime-status');
             const gameModeInput = document.getElementById('speech-game-mode');
             const gameModeStatus = document.getElementById('speech-game-mode-status');
+            const voiceSceneAliasesInput = document.getElementById('voice-scene-aliases');
+            const voiceTextCorrectionsInput = document.getElementById('voice-text-corrections');
+            const voiceIgnoredInput = document.getElementById('voice-ignored-transcripts');
+            const voiceDictionaryStatus = document.getElementById('voice-dictionary-status');
             const selectedOption = select.options[select.selectedIndex];
             const sceneMappings = {
                 starting: document.getElementById('scene-mapping-starting')?.value || '',
@@ -929,6 +1207,14 @@
                 brb: document.getElementById('scene-mapping-brb')?.value || '',
                 raid: document.getElementById('scene-mapping-raid')?.value || '',
                 gameplay: document.getElementById('scene-mapping-gameplay')?.value || ''
+            };
+            const voiceDictionary = {
+                sceneAliases: mergeSceneAliases(
+                    parseVoiceSceneAliases(voiceSceneAliasesInput?.value || ''),
+                    getPrioritySlotAliases()
+                ),
+                textCorrections: parseVoiceTextCorrections(voiceTextCorrectionsInput?.value || ''),
+                ignoredTranscripts: parseIgnoredTranscripts(voiceIgnoredInput?.value || '')
             };
 
             if (!window.electronAPI?.saveSettings) {
@@ -942,9 +1228,11 @@
                     preferredMicDeviceId: select.value || '',
                     preferredMicLabel: selectedOption?.textContent || '',
                     speechCommandModel: modelSelect?.value || 'tiny.en',
+                    speechRuntime: runtimeSelect?.value || 'cli',
                     speechGameMode: Boolean(gameModeInput?.checked),
                     voiceHotkey: hotkeyInput?.value?.trim() || '',
-                    sceneMappings
+                    sceneMappings,
+                    voiceDictionary
                 });
                 status.textContent = select.value
                     ? `Saved microphone: ${selectedOption.textContent}`
@@ -964,10 +1252,21 @@
                         ? 'Balanced mode saved. Expect slower but slightly more accurate recognition.'
                         : 'Fast mode saved. Recommended for quick commands during gameplay.';
                 }
+                if (runtimeStatus) {
+                    runtimeStatus.textContent = runtimeSelect?.value === 'cli'
+                        ? 'Stable CLI runtime saved. This remains the recommended production path.'
+                        : 'Experimental runtime saved. StreamVoice will fall back to CLI automatically if the addon is unavailable or fails.';
+                }
                 if (gameModeStatus) {
                     gameModeStatus.textContent = gameModeInput?.checked
                         ? 'Game mode saved. Short commands will snap faster during gameplay.'
                         : 'Game mode disabled. Speech will stay more literal.';
+                }
+                if (voiceDictionaryStatus) {
+                    const aliasCount = Object.keys(voiceDictionary.sceneAliases || {}).length;
+                    const correctionCount = (voiceDictionary.textCorrections || []).length;
+                    const ignoredCount = (voiceDictionary.ignoredTranscripts || []).length;
+                    voiceDictionaryStatus.textContent = `Saved voice dictionary: ${aliasCount} alias group(s), ${correctionCount} correction(s), ${ignoredCount} ignored phrase(s).`;
                 }
                 if (window.streamVoice) {
                     window.streamVoice.workflowProfile = workflowSelect?.value || 'basic_live_control';
@@ -977,6 +1276,7 @@
                     window.streamVoice.updateConnectionStatus?.();
                 }
                 document.getElementById('scene-mapping-status').textContent = 'Saved scene mapping preferences.';
+                refreshSceneMappingOptions(sceneMappings);
             } catch (error) {
                 status.textContent = `Failed to save microphone selection: ${error.message}`;
                 if (workflowStatus) {
@@ -988,8 +1288,14 @@
                 if (modelStatus) {
                     modelStatus.textContent = `Failed to save voice mode: ${error.message}`;
                 }
+                if (runtimeStatus) {
+                    runtimeStatus.textContent = `Failed to save speech runtime: ${error.message}`;
+                }
                 if (gameModeStatus) {
                     gameModeStatus.textContent = `Failed to save game mode: ${error.message}`;
+                }
+                if (voiceDictionaryStatus) {
+                    voiceDictionaryStatus.textContent = `Failed to save voice dictionary: ${error.message}`;
                 }
             }
         }
@@ -1103,6 +1409,9 @@
                     const settings = await window.electronAPI.getSettings();
                     preferredMicDeviceId = settings.preferredMicDeviceId || '';
                     savedSceneMappings = settings.sceneMappings || {};
+                    const voiceSceneAliasesInput = document.getElementById('voice-scene-aliases');
+                    const voiceTextCorrectionsInput = document.getElementById('voice-text-corrections');
+                    const voiceIgnoredInput = document.getElementById('voice-ignored-transcripts');
                     const hotkeyInput = document.getElementById('voice-hotkey');
                     if (hotkeyInput) {
                         hotkeyInput.value = settings.voiceHotkey || '';
@@ -1115,9 +1424,23 @@
                     if (modelSelect) {
                         modelSelect.value = settings.speechCommandModel || 'tiny.en';
                     }
+                    const runtimeSelect = document.getElementById('speech-runtime');
+                    if (runtimeSelect) {
+                        runtimeSelect.value = settings.speechRuntime || 'cli';
+                    }
                     const gameModeInput = document.getElementById('speech-game-mode');
                     if (gameModeInput) {
                         gameModeInput.checked = settings.speechGameMode !== false;
+                    }
+                    if (voiceSceneAliasesInput) {
+                        voiceSceneAliasesInput.value = formatVoiceSceneAliases(settings.voiceDictionary?.sceneAliases || {});
+                    }
+                    applyPrioritySlotAliases(settings.voiceDictionary?.sceneAliases || {});
+                    if (voiceTextCorrectionsInput) {
+                        voiceTextCorrectionsInput.value = formatVoiceTextCorrections(settings.voiceDictionary?.textCorrections || []);
+                    }
+                    if (voiceIgnoredInput) {
+                        voiceIgnoredInput.value = (settings.voiceDictionary?.ignoredTranscripts || []).join('\n');
                     }
                 }
 
@@ -1153,6 +1476,11 @@
             setInterval(() => {
                 refreshSceneMappingOptions(window.electronAPI?.getSettings ? undefined : {});
             }, 4000);
+            ['voice-slot-camera1','voice-slot-camera2','voice-slot-camera3','voice-slot-camera4','voice-slot-powerpoint','voice-slot-browser','voice-slot-pip','scene-mapping-brb','scene-mapping-gameplay'].forEach((id) => {
+                const element = document.getElementById(id);
+                element?.addEventListener('input', () => refreshSceneMappingOptions());
+                element?.addEventListener('change', () => refreshSceneMappingOptions());
+            });
         });
     </script>
 </body>

@@ -13,6 +13,10 @@ class SpeechService extends EventEmitter {
       transcribing: false,
       model: 'base.en',
       modelStatus: 'not_installed',
+      runtime: 'cli',
+      runtimeRequested: 'cli',
+      runtimeStatus: 'ready',
+      runtimeMessage: null,
       modelPath: null,
       binaryPath: null,
       transcript: '',
@@ -22,6 +26,10 @@ class SpeechService extends EventEmitter {
       lastPreviewSequence: 0,
       lastTranscriptAt: null,
       lastCommand: null,
+      lastIntent: null,
+      lastCorrections: [],
+      lastIgnored: false,
+      lastSafetyDecision: null,
       lastCommandStatus: null,
       lastCommandMessage: null,
       lastError: null,
@@ -37,6 +45,9 @@ class SpeechService extends EventEmitter {
       lastWhisperAudioPath: null,
       lastWhisperModel: null,
       lastWhisperBinaryPath: null,
+      lastWhisperRuntimeRequested: null,
+      lastWhisperRuntimeResolved: null,
+      lastWhisperRuntimeFallbackReason: null,
       lastWhisperAttemptCount: 0,
       lastWhisperFallbackUsed: false,
       speechEvents: [],
@@ -86,6 +97,10 @@ class SpeechService extends EventEmitter {
       transcript: '',
       partialTranscript: '',
       lastCommand: null,
+      lastIntent: null,
+      lastCorrections: [],
+      lastIgnored: false,
+      lastSafetyDecision: null,
       lastCommandStatus: null,
       lastCommandMessage: null,
       lastError: null
@@ -113,15 +128,23 @@ class SpeechService extends EventEmitter {
 
   updateRuntimeConfig(config = {}) {
     return this.setState({
+      runtime: config.runtime ?? this.state.runtime,
+      runtimeRequested: config.runtimeRequested ?? this.state.runtimeRequested,
+      runtimeStatus: config.runtimeStatus ?? this.state.runtimeStatus,
+      runtimeMessage: config.runtimeMessage ?? this.state.runtimeMessage,
       modelStatus: config.modelStatus ?? this.state.modelStatus,
       modelPath: config.modelPath ?? this.state.modelPath,
       binaryPath: config.binaryPath ?? this.state.binaryPath
     });
   }
 
-  recordCommand(command, result = {}) {
+  recordCommand(command, result = {}, metadata = {}) {
     return this.setState({
       lastCommand: command,
+      lastIntent: metadata.intent || null,
+      lastCorrections: Array.isArray(metadata.corrections) ? metadata.corrections : [],
+      lastIgnored: Boolean(metadata.ignored),
+      lastSafetyDecision: metadata.safetyDecision || null,
       lastCommandStatus: result.success ? 'success' : 'error',
       lastCommandMessage: result.message || result.error || null
     });
@@ -176,6 +199,9 @@ class SpeechService extends EventEmitter {
       lastWhisperAudioPath: details.audioPath || this.state.lastWhisperAudioPath,
       lastWhisperModel: details.modelPreference || details.modelName || this.state.lastWhisperModel,
       lastWhisperBinaryPath: details.binaryPath || this.state.lastWhisperBinaryPath,
+      lastWhisperRuntimeRequested: details.runtimeRequested || this.state.lastWhisperRuntimeRequested,
+      lastWhisperRuntimeResolved: details.runtimeResolved || this.state.lastWhisperRuntimeResolved,
+      lastWhisperRuntimeFallbackReason: details.runtimeFallbackReason || this.state.lastWhisperRuntimeFallbackReason,
       lastWhisperAttemptCount: details.attemptCount ?? this.state.lastWhisperAttemptCount,
       lastWhisperFallbackUsed: details.fallbackUsed ?? this.state.lastWhisperFallbackUsed
     });

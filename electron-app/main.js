@@ -6,7 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { SpeechService } = require('./services/speech-service');
-const { resolveWhisperConfig, transcribeWithWhisper } = require('./services/whisper-runner');
+const { resolveWhisperRuntimeConfig, transcribeWithWhisperRuntime } = require('./services/whisper-runtime');
 const { NativeSpeechCaptureService } = require('./services/native-speech-capture-service');
 
 let mainWindow;
@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.14',
+          message: 'StreamVoice v1.1.0-beta.15',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -667,10 +667,11 @@ async function transcribeSpeechWithFallback({ primaryAudioPath, fallbackAudioPat
   for (const attempt of attempts) {
     attemptCount += 1;
     try {
-      const whisperResult = await transcribeWithWhisper({
+      const whisperResult = await transcribeWithWhisperRuntime({
         audioPath: attempt.audioPath,
         appRoot,
         userDataPath,
+        runtime: appSettings.speechRuntime || 'cli',
         modelPreference: attempt.modelPreference
       });
 
@@ -904,6 +905,17 @@ function loadAppSettings() {
       ...appSettings,
       ...savedSettings
     };
+    appSettings.voiceDictionary = {
+      textCorrections: Array.isArray(savedSettings.voiceDictionary?.textCorrections)
+        ? savedSettings.voiceDictionary.textCorrections
+        : appSettings.voiceDictionary.textCorrections,
+      ignoredTranscripts: Array.isArray(savedSettings.voiceDictionary?.ignoredTranscripts)
+        ? savedSettings.voiceDictionary.ignoredTranscripts
+        : appSettings.voiceDictionary.ignoredTranscripts,
+      sceneAliases: savedSettings.voiceDictionary?.sceneAliases && typeof savedSettings.voiceDictionary.sceneAliases === 'object'
+        ? savedSettings.voiceDictionary.sceneAliases
+        : appSettings.voiceDictionary.sceneAliases
+    };
   } catch (error) {
     console.warn('Failed to load app settings:', error.message);
   }
@@ -1042,17 +1054,22 @@ function syncSpeechCaptureMonitor() {
 }
 
 function updateSpeechRuntimeConfig() {
-  const config = resolveWhisperConfig({
+  const config = resolveWhisperRuntimeConfig({
     appRoot: __dirname,
     userDataPath: app.getPath('userData'),
+    runtime: appSettings.speechRuntime || 'cli',
     modelPreference: appSettings.speechCommandModel || 'tiny.en'
   });
 
   speechService.setMode(appSettings.speechInputMode || 'push_to_talk');
   speechService.updateRuntimeConfig({
+    runtimeRequested: config.requestedRuntime || config.runtime,
     binaryPath: config.binaryPath,
     modelPath: config.modelPath,
-    modelStatus: config.binaryPath && config.modelPath ? 'ready' : 'not_installed'
+    modelStatus: config.modelStatus || (config.binaryPath && config.modelPath ? 'ready' : 'not_installed'),
+    runtime: config.runtime,
+    runtimeStatus: config.runtimeStatus,
+    runtimeMessage: config.runtimeMessage
   });
   speechService.setState({
     model: appSettings.speechCommandModel || 'tiny.en'
@@ -1069,8 +1086,72 @@ function normalizeSpeechTranscript(transcript) {
     .toLowerCase();
 }
 
+const BUILT_IN_TEXT_CORRECTIONS = [
+  [/\band mute (the )?(mic|microphone)\b/g, 'unmute $2'],
+  [/\bpower point\b/g, 'powerpoint'],
+  [/\bpicture in picture\b/g, 'pip'],
+  [/\bbe right back\b/g, 'brb'],
+  [/\bpre view\b/g, 'preview'],
+  [/\bgo live\b/g, 'start stream'],
+  [/\bgo to the\b/g, 'go to'],
+  [/\bswitch the\b/g, 'switch to'],
+  [/\bturn up my mic\b/g, 'turn up the mic'],
+  [/\bturn down my mic\b/g, 'turn down the mic'],
+  [/\bturn up my microphone\b/g, 'turn up the mic'],
+  [/\bturn down my microphone\b/g, 'turn down the mic'],
+  [/\bturn up the audio\b/g, 'turn up desktop'],
+  [/\bturn down the audio\b/g, 'turn down desktop'],
+  [/\bstop the record\b/g, 'stop recording']
+];
+
+function applySpeechCorrections(transcript) {
+  let corrected = normalizeSpeechTranscript(transcript);
+  const appliedCorrections = [];
+
+  BUILT_IN_TEXT_CORRECTIONS.forEach(([pattern, replacement]) => {
+    const before = corrected;
+    corrected = corrected.replace(pattern, replacement);
+    if (corrected !== before) {
+      appliedCorrections.push({
+        type: 'built_in',
+        from: before,
+        to: corrected,
+        replacement
+      });
+    }
+  });
+
+  const customCorrections = Array.isArray(appSettings.voiceDictionary?.textCorrections)
+    ? appSettings.voiceDictionary.textCorrections
+    : [];
+
+  customCorrections.forEach((entry) => {
+    const from = normalizeSpeechTranscript(entry?.from || '');
+    const to = normalizeSpeechTranscript(entry?.to || '');
+    if (!from || !to) {
+      return;
+    }
+
+    const escapedFrom = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const before = corrected;
+    corrected = corrected.replace(new RegExp(`\\b${escapedFrom}\\b`, 'g'), to);
+    if (corrected !== before) {
+      appliedCorrections.push({
+        type: 'custom',
+        from,
+        to
+      });
+    }
+  });
+
+  return {
+    transcript: corrected.replace(/\s+/g, ' ').trim(),
+    appliedCorrections
+  };
+}
+
 function normalizeGameModeTranscript(transcript) {
-  return normalizeSpeechTranscript(transcript)
+  return applySpeechCorrections(transcript).transcript
     .replace(/\b(the|please|can you|could you|would you|hey|okay|ok|now)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -1085,103 +1166,386 @@ function normalizeCameraNumberWords(value) {
     .trim();
 }
 
+function normalizeSceneTargetWords(value) {
+  return normalizeCameraNumberWords(String(value || ''))
+    .replace(/\bpower point\b/g, 'powerpoint')
+    .replace(/\bpicture in picture\b/g, 'pip')
+    .replace(/\bbe right back\b/g, 'brb')
+    .replace(/\bcam\b/g, 'camera')
+    .replace(/\bscene\b$/g, '')
+    .replace(/\bthe\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const LOW_SIGNAL_TRANSCRIPTS = new Set([
   'you',
   'thank you',
   'thanks',
   'thank',
   'yeah',
+  'ya',
   'yes',
   'yep',
+  'yup',
+  'okay',
+  'ok',
+  'sure',
+  'cool',
+  'all right',
+  'alright',
   'no',
   'huh',
   'uh',
   'um',
-  'hmm'
+  'hmm',
+  'hello',
+  'hey',
+  'hi'
 ]);
 
-function extractDesktopCommand(transcript) {
-  const normalized = normalizeSpeechTranscript(transcript);
-  const gameNormalized = appSettings.speechGameMode ? normalizeGameModeTranscript(transcript) : normalized;
-  const activeTranscript = gameNormalized || normalized;
+const SCENE_SWITCH_VERBS = [
+  'switch to',
+  'switch',
+  'go to',
+  'go',
+  'show',
+  'bring up',
+  'take me to',
+  'take to'
+];
 
-  if (!activeTranscript) {
+function compactWords(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function hasStandaloneWord(transcript, word) {
+  return new RegExp(`\\b${word}\\b`).test(transcript);
+}
+
+function hasAnyStandaloneWord(transcript, words = []) {
+  return words.some((word) => hasStandaloneWord(transcript, word));
+}
+
+function detectCameraSlotFromWords(transcript) {
+  if (!transcript) {
     return '';
   }
 
-  const compact = ` ${activeTranscript} `;
-  const includesPhrase = (phrase) => compact.includes(` ${phrase} `);
+  if (/\b(camera|cam)\s*(1|one|won)\b/.test(transcript)) return 'camera 1';
+  if (/\b(camera|cam)\s*(2|two|too)\b/.test(transcript)) return 'camera 2';
+  if (/\b(camera|cam)\s*(3|three|tree)\b/.test(transcript)) return 'camera 3';
+  if (/\b(camera|cam)\s*(4|four|fore)\b/.test(transcript)) return 'camera 4';
+  return '';
+}
 
-  if (LOW_SIGNAL_TRANSCRIPTS.has(activeTranscript)) {
+function isSingleWordTranscript(transcript) {
+  return compactWords(transcript).split(/\s+/).filter(Boolean).length === 1;
+}
+
+function parseMuteIntent(activeTranscript, rawTranscript) {
+  const transcript = compactWords(activeTranscript);
+  const raw = compactWords(rawTranscript);
+  const hasMicReference = hasAnyStandaloneWord(transcript, ['mic', 'microphone']);
+  const hasMuteWord = hasStandaloneWord(transcript, 'mute');
+  const hasUnmuteWord = hasStandaloneWord(transcript, 'unmute');
+
+  if (hasMuteWord && hasUnmuteWord) {
+    return {
+      command: '',
+      intent: 'ambiguous_mute',
+      safetyDecision: 'blocked_ambiguous_mute_unmute',
+      error: 'Speech was ambiguous between mute and unmute. Please repeat the command.'
+    };
+  }
+
+  if (/^unmute(?: the)?(?: mic| microphone)?$/.test(transcript) || /^turn (?:the )?mic back on$/.test(transcript) || /^mic back on$/.test(transcript)) {
+    return { command: 'unmute', intent: 'unmute_mic', safetyDecision: 'safe_exact_unmute' };
+  }
+
+  if (/^mute(?: the)?(?: mic| microphone)?$/.test(transcript) || /^turn (?:the )?mic off$/.test(transcript) || /^mic off$/.test(transcript)) {
+    return { command: 'mute', intent: 'mute_mic', safetyDecision: 'safe_exact_mute' };
+  }
+
+  if (transcript.includes('and mute') && raw.includes('and mute')) {
+    return {
+      command: '',
+      intent: 'ambiguous_unmute',
+      safetyDecision: 'blocked_phrase_and_mute',
+      error: 'Speech sounded like "and mute", which is too ambiguous. Please say "unmute mic" clearly.'
+    };
+  }
+
+  if (hasUnmuteWord && (hasMicReference || transcript === 'unmute')) {
+    return { command: 'unmute', intent: 'unmute_mic', safetyDecision: 'safe_keyword_unmute' };
+  }
+
+  if (hasMuteWord && (hasMicReference || transcript === 'mute')) {
+    return { command: 'mute', intent: 'mute_mic', safetyDecision: 'safe_keyword_mute' };
+  }
+
+  return null;
+}
+
+function getKnownSceneTargets() {
+  const baseTargets = [
+    'starting',
+    'ending',
+    'brb',
+    'raid',
+    'gameplay',
+    'camera 1',
+    'camera 2',
+    'camera 3',
+    'camera 4',
+    'pip',
+    'browser',
+    'powerpoint',
+    'desktop'
+  ];
+  const mappedTargets = Object.entries(appSettings.sceneMappings || {})
+    .filter(([, value]) => value)
+    .map(([key]) => key);
+  return Array.from(new Set([...baseTargets, ...mappedTargets]));
+}
+
+function resolveSceneCommandTarget(rawTarget) {
+  const target = normalizeSceneTargetWords(rawTarget);
+  if (!target) {
     return '';
   }
 
-  const micVolumeMatch = activeTranscript.match(/\bmic volume (\d+)\s*percent\b/);
-  if (micVolumeMatch) {
-    return `mic volume ${micVolumeMatch[1]} percent`;
+  const knownScenes = Array.isArray(desktopObsState.scenes) ? desktopObsState.scenes : [];
+  const knownTargets = getKnownSceneTargets();
+
+  for (const sceneTarget of knownTargets) {
+    const aliases = getSceneAliases(sceneTarget).map(normalizeSceneTargetWords).filter(Boolean);
+    if (aliases.includes(target) || aliases.some((alias) => alias === target || target === alias)) {
+      return sceneTarget;
+    }
   }
 
-  const desktopVolumeMatch = activeTranscript.match(/\bdesktop volume (\d+)\s*percent\b/);
-  if (desktopVolumeMatch) {
-    return `desktop volume ${desktopVolumeMatch[1]} percent`;
+  const directSceneMatch = knownScenes.find((sceneName) => normalizeSceneTargetWords(sceneName) === target);
+  if (directSceneMatch) {
+    return directSceneMatch.toLowerCase();
   }
 
-  if (/\b(turn|move|bring)\s+(up|down)\s+((the|my)\s+)?mic(rophone)?\b/.test(activeTranscript)) {
-    return activeTranscript.includes('down') ? 'mic volume down step' : 'mic volume up step';
+  const bestTargetMatch = findBestSceneMatch(knownTargets, target);
+  if (bestTargetMatch) {
+    return bestTargetMatch;
   }
 
-  if (/\b(turn|move|bring)\s+(up|down)\s+((the|my)\s+)?(desktop|audio)\b/.test(activeTranscript)) {
-    return activeTranscript.includes('down') ? 'desktop volume down step' : 'desktop volume up step';
+  const bestSceneMatch = findBestSceneMatch(knownScenes, target);
+  if (bestSceneMatch) {
+    return bestSceneMatch.toLowerCase();
   }
 
-  if (appSettings.speechGameMode) {
-    if (activeTranscript === 'live' || activeTranscript === 'go' || activeTranscript === 'stream') return 'start stream';
-    if (activeTranscript === 'stop') return 'stop stream';
-    if (activeTranscript === 'cut') return 'cut';
-    if (activeTranscript === 'break' || activeTranscript === 'brb') return 'switch to break';
-    if (activeTranscript === 'gameplay' || activeTranscript === 'game') return 'switch to gameplay';
-    if (activeTranscript === 'camera one' || activeTranscript === 'cam one' || activeTranscript === 'one' || activeTranscript === 'won') return 'switch to camera 1';
-    if (activeTranscript === 'camera two' || activeTranscript === 'cam two' || activeTranscript === 'two' || activeTranscript === 'too') return 'switch to camera 2';
-    if (activeTranscript === 'camera three' || activeTranscript === 'cam three' || activeTranscript === 'three' || activeTranscript === 'tree') return 'switch to camera 3';
-    if (activeTranscript === 'camera four' || activeTranscript === 'cam four' || activeTranscript === 'four' || activeTranscript === 'fore') return 'switch to camera 4';
-    if (activeTranscript === 'raid') return 'raid mode';
-    if (activeTranscript === 'record') return 'record';
-    if (activeTranscript === 'screenshot' || activeTranscript === 'shot') return 'screenshot';
-  }
+  return target;
+}
 
-  if (includesPhrase('stream starting setup')) return 'stream starting setup';
-  if (includesPhrase('stream ending setup')) return 'stream ending setup';
-  if (includesPhrase('emergency mute')) return 'emergency mute';
-  if (includesPhrase('cut')) return 'cut';
-  if (includesPhrase('subscriber celebration')) return 'subscriber celebration';
-  if (includesPhrase('raid mode')) return 'raid mode';
-  if (includesPhrase('start streaming') || includesPhrase('start the stream') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
-  if (includesPhrase('stop streaming') || includesPhrase('stop the stream') || includesPhrase('stop stream') || includesPhrase('end the stream') || includesPhrase('end stream')) return 'stop stream';
-  if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('stop the record') || includesPhrase('end recording')) return 'stop recording';
-  if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) return 'record';
-  if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
-  if (includesPhrase('unmute the microphone') || includesPhrase('unmute the mic')) return 'unmute';
-  if (includesPhrase('unmute microphone') || includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
-  if (includesPhrase('mute the microphone') || includesPhrase('mute the mic')) return 'mute';
-  if (includesPhrase('mute microphone') || includesPhrase('mute mic') || includesPhrase('mute my mic') || includesPhrase('mute')) return 'mute';
+function parseSceneSwitchCommand(transcript) {
+  for (const verb of SCENE_SWITCH_VERBS) {
+    const pattern = new RegExp(`\\b${verb.replace(/\s+/g, '\\s+')}\\b\\s+(.+)$`);
+    const match = transcript.match(pattern);
+    if (!match) {
+      continue;
+    }
 
-  const switchMatch = activeTranscript.match(/\b(?:switch|go)\s+(?:to\s+)?(?:the\s+)?(.+)$/);
-  if (switchMatch) {
-    const target = normalizeCameraNumberWords(switchMatch[1]?.trim());
+    const target = resolveSceneCommandTarget(match[1]);
     if (target) {
       return `switch to ${target}`;
     }
   }
 
+  return '';
+}
+
+function parseDirectSceneReference(transcript) {
   const knownScenes = Array.isArray(desktopObsState.scenes) ? desktopObsState.scenes : [];
   for (const sceneName of knownScenes) {
-    const lowerScene = String(sceneName).toLowerCase();
-    if (lowerScene && normalized.includes(lowerScene)) {
-      return `switch to ${lowerScene}`;
+    const normalizedScene = normalizeSceneTargetWords(sceneName);
+    if (normalizedScene && transcript.includes(normalizedScene)) {
+      return `switch to ${sceneName.toLowerCase()}`;
     }
   }
 
-  return normalized;
+  return '';
+}
+
+function parseDesktopIntent(transcript) {
+  const correctionResult = applySpeechCorrections(transcript);
+  const normalized = correctionResult.transcript;
+  const rawNormalized = normalizeSpeechTranscript(transcript);
+  const gameNormalized = appSettings.speechGameMode ? normalizeGameModeTranscript(transcript) : normalized;
+  const activeTranscript = gameNormalized || normalized;
+
+  const ignoredTranscripts = new Set([
+    ...LOW_SIGNAL_TRANSCRIPTS,
+    ...((appSettings.voiceDictionary?.ignoredTranscripts || []).map((value) => normalizeSpeechTranscript(value)).filter(Boolean))
+  ]);
+
+  if (!activeTranscript || ignoredTranscripts.has(activeTranscript)) {
+    return {
+      transcript: activeTranscript,
+      command: '',
+      appliedCorrections: correctionResult.appliedCorrections,
+      ignored: ignoredTranscripts.has(activeTranscript),
+      safetyDecision: ignoredTranscripts.has(activeTranscript) ? 'ignored_low_signal' : null
+    };
+  }
+
+  const compact = ` ${activeTranscript} `;
+  const includesPhrase = (phrase) => compact.includes(` ${phrase} `);
+  const singleWordTranscript = isSingleWordTranscript(activeTranscript);
+
+  const micVolumeMatch = activeTranscript.match(/\bmic volume (\d+)\s*percent\b/);
+  if (micVolumeMatch) {
+    return { transcript: activeTranscript, command: `mic volume ${micVolumeMatch[1]} percent`, intent: 'set_mic_volume', appliedCorrections: correctionResult.appliedCorrections };
+  }
+
+  const desktopVolumeMatch = activeTranscript.match(/\bdesktop volume (\d+)\s*percent\b/);
+  if (desktopVolumeMatch) {
+    return { transcript: activeTranscript, command: `desktop volume ${desktopVolumeMatch[1]} percent`, intent: 'set_desktop_volume', appliedCorrections: correctionResult.appliedCorrections };
+  }
+
+  if (/\b(turn|move|bring)\s+(up|down)\s+((the|my)\s+)?mic(rophone)?\b/.test(activeTranscript)) {
+    return {
+      transcript: activeTranscript,
+      command: activeTranscript.includes('down') ? 'mic volume down step' : 'mic volume up step',
+      intent: 'adjust_mic_volume',
+      appliedCorrections: correctionResult.appliedCorrections
+    };
+  }
+
+  if (/\b(turn|move|bring)\s+(up|down)\s+((the|my)\s+)?(desktop|audio)\b/.test(activeTranscript)) {
+    return {
+      transcript: activeTranscript,
+      command: activeTranscript.includes('down') ? 'desktop volume down step' : 'desktop volume up step',
+      intent: 'adjust_desktop_volume',
+      appliedCorrections: correctionResult.appliedCorrections
+    };
+  }
+
+  if (appSettings.speechGameMode) {
+    if (activeTranscript === 'live' || activeTranscript === 'go' || activeTranscript === 'stream') {
+      return { transcript: activeTranscript, command: 'start stream', intent: 'start_stream', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'stop') {
+      return { transcript: activeTranscript, command: 'stop stream', intent: 'stop_stream', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'cut') {
+      return { transcript: activeTranscript, command: 'cut', intent: 'studio_cut', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'break' || activeTranscript === 'brb') {
+      return { transcript: activeTranscript, command: 'switch to break', intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'gameplay' || activeTranscript === 'game') {
+      return { transcript: activeTranscript, command: 'switch to gameplay', intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (['camera one', 'cam one', 'one', 'won'].includes(activeTranscript)) {
+      return { transcript: activeTranscript, command: 'switch to camera 1', intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (['camera two', 'cam two', 'two', 'too'].includes(activeTranscript)) {
+      return { transcript: activeTranscript, command: 'switch to camera 2', intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (['camera three', 'cam three', 'three', 'tree'].includes(activeTranscript)) {
+      return { transcript: activeTranscript, command: 'switch to camera 3', intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (['camera four', 'cam four', 'four', 'fore'].includes(activeTranscript)) {
+      return { transcript: activeTranscript, command: 'switch to camera 4', intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'raid') {
+      return { transcript: activeTranscript, command: 'raid mode', intent: 'raid_mode', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'record') {
+      return { transcript: activeTranscript, command: 'record', intent: 'start_recording', appliedCorrections: correctionResult.appliedCorrections };
+    }
+    if (activeTranscript === 'screenshot' || activeTranscript === 'shot') {
+      return { transcript: activeTranscript, command: 'screenshot', intent: 'screenshot', appliedCorrections: correctionResult.appliedCorrections };
+    }
+  }
+
+  if (includesPhrase('stream starting setup')) return { transcript: activeTranscript, command: 'stream starting setup', intent: 'stream_starting_setup', appliedCorrections: correctionResult.appliedCorrections };
+  if (includesPhrase('stream ending setup')) return { transcript: activeTranscript, command: 'stream ending setup', intent: 'stream_ending_setup', appliedCorrections: correctionResult.appliedCorrections };
+  if (includesPhrase('emergency mute')) return { transcript: activeTranscript, command: 'emergency mute', intent: 'emergency_mute', appliedCorrections: correctionResult.appliedCorrections };
+  if (includesPhrase('subscriber celebration')) return { transcript: activeTranscript, command: 'subscriber celebration', intent: 'subscriber_celebration', appliedCorrections: correctionResult.appliedCorrections };
+  if (includesPhrase('raid mode')) return { transcript: activeTranscript, command: 'raid mode', intent: 'raid_mode', appliedCorrections: correctionResult.appliedCorrections };
+
+  if (includesPhrase('start streaming') || includesPhrase('start the stream') || includesPhrase('start stream') || includesPhrase('go live')) {
+    return { transcript: activeTranscript, command: 'start stream', intent: 'start_stream', appliedCorrections: correctionResult.appliedCorrections };
+  }
+  if (includesPhrase('stop streaming') || includesPhrase('stop the stream') || includesPhrase('stop stream') || includesPhrase('end the stream') || includesPhrase('end stream')) {
+    return { transcript: activeTranscript, command: 'stop stream', intent: 'stop_stream', appliedCorrections: correctionResult.appliedCorrections };
+  }
+  if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('stop the record') || includesPhrase('end recording')) {
+    return { transcript: activeTranscript, command: 'stop recording', intent: 'stop_recording', appliedCorrections: correctionResult.appliedCorrections };
+  }
+  if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) {
+    return { transcript: activeTranscript, command: 'record', intent: 'start_recording', appliedCorrections: correctionResult.appliedCorrections };
+  }
+  if (includesPhrase('take screenshot') || includesPhrase('screenshot')) {
+    return { transcript: activeTranscript, command: 'screenshot', intent: 'screenshot', appliedCorrections: correctionResult.appliedCorrections };
+  }
+
+  const muteIntent = parseMuteIntent(activeTranscript, rawNormalized);
+  if (muteIntent) {
+    return {
+      transcript: activeTranscript,
+      command: muteIntent.command,
+      intent: muteIntent.intent,
+      appliedCorrections: correctionResult.appliedCorrections,
+      safetyDecision: muteIntent.safetyDecision || null,
+      error: muteIntent.error || null
+    };
+  }
+
+  if (singleWordTranscript) {
+    return {
+      transcript: activeTranscript,
+      command: '',
+      intent: 'ambiguous_single_word',
+      appliedCorrections: correctionResult.appliedCorrections,
+      safetyDecision: 'blocked_single_word_fallback',
+      error: 'Speech was too short or ambiguous. Try a longer command like "unmute mic" or "switch to camera 1".'
+    };
+  }
+
+  if (hasStandaloneWord(activeTranscript, 'cut')) {
+    return { transcript: activeTranscript, command: 'cut', intent: 'studio_cut', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_cut' };
+  }
+
+  const explicitCameraSlot = detectCameraSlotFromWords(activeTranscript);
+  if (explicitCameraSlot) {
+    return {
+      transcript: activeTranscript,
+      command: `switch to ${explicitCameraSlot}`,
+      intent: 'switch_scene',
+      appliedCorrections: correctionResult.appliedCorrections,
+      safetyDecision: 'safe_explicit_camera_slot'
+    };
+  }
+
+  const sceneCommand = parseSceneSwitchCommand(activeTranscript);
+  if (sceneCommand) {
+    return { transcript: activeTranscript, command: sceneCommand, intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_scene_switch' };
+  }
+
+  const sceneReference = parseDirectSceneReference(activeTranscript);
+  if (sceneReference) {
+    return { transcript: activeTranscript, command: sceneReference, intent: 'switch_scene', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_scene_reference' };
+  }
+
+  return {
+    transcript: activeTranscript,
+    command: compactWords(activeTranscript),
+    intent: 'unknown',
+    appliedCorrections: correctionResult.appliedCorrections,
+    safetyDecision: 'no_safe_match'
+  };
+}
+
+function extractDesktopCommand(transcript) {
+  return parseDesktopIntent(transcript).command;
 }
 
 function updateDesktopSubsystemHealth(subsystem, status, extra = {}) {
@@ -1250,8 +1614,8 @@ function getSceneAliases(targetScene) {
     powerpoint: ['powerpoint', 'power point', 'slides', 'slide deck', 'presentation'],
     desktop: ['desktop', 'screen', 'screen share']
   };
-
-  return aliasMap[key] || [targetScene];
+  const customAliases = appSettings.voiceDictionary?.sceneAliases?.[key];
+  return [...new Set([...(aliasMap[key] || [targetScene]), ...(Array.isArray(customAliases) ? customAliases : [])])];
 }
 
 function getStrictSceneTokenRules(targetScene) {
@@ -1484,18 +1848,23 @@ async function desktopCutTransition() {
 }
 
 async function executeDesktopCommand(command) {
-  const normalized = extractDesktopCommand(command);
+  const parsedIntent = parseDesktopIntent(command);
+  const normalized = parsedIntent.command;
   const micVolumeMatch = normalized.match(/^mic volume (\d+)\s*percent$/);
   const desktopVolumeMatch = normalized.match(/^desktop volume (\d+)\s*percent$/);
   let result;
 
   if (!normalized) {
-    throw new Error('Command is required');
+    throw new Error(parsedIntent.error || 'Command is required');
   }
 
   speechService.logEvent('command-extracted', {
     heard: command,
-    command: normalized
+    command: normalized,
+    intent: parsedIntent.intent || 'unknown',
+    corrections: parsedIntent.appliedCorrections || [],
+    ignored: Boolean(parsedIntent.ignored),
+    safetyDecision: parsedIntent.safetyDecision || 'unknown'
   });
 
   if (normalized.startsWith('switch to ')) {
@@ -1571,10 +1940,17 @@ async function executeDesktopCommand(command) {
     result: result.success ? 'success' : 'error',
     message: result.message
   });
+  speechService.recordCommand(normalized, result, {
+    intent: parsedIntent.intent || 'unknown',
+    corrections: parsedIntent.appliedCorrections || [],
+    ignored: Boolean(parsedIntent.ignored),
+    safetyDecision: parsedIntent.safetyDecision || null
+  });
   speechService.logEvent('command-result', {
     command: normalized,
     success: Boolean(result.success),
-    message: result.message || ''
+    message: result.message || '',
+    safetyDecision: parsedIntent.safetyDecision || 'unknown'
   });
 
   return result;
@@ -1802,11 +2178,17 @@ let appSettings = {
   autoConnect: true,
   workflowProfile: 'basic_live_control',
   speechInputMode: 'push_to_talk',
+  speechRuntime: 'cli',
   speechCommandModel: 'tiny.en',
   speechGameMode: true,
   voiceHotkey: 'Ctrl+Shift+`',
   preferredMicDeviceId: '',
   preferredMicLabel: '',
+  voiceDictionary: {
+    textCorrections: [],
+    ignoredTranscripts: [],
+    sceneAliases: {}
+  },
   sceneMappings: {
     starting: '',
     ending: '',
@@ -2069,11 +2451,12 @@ ipcMain.handle('speech-preview-audio', async (_event, payload) => {
     const filePath = await persistSpeechCapture(payload.audioBytes, {
       mimeType: payload.mimeType
     });
-    const whisperResult = await transcribeWithWhisper({
+    const whisperResult = await transcribeWithWhisperRuntime({
       audioPath: filePath,
       appRoot: __dirname,
       userDataPath: app.getPath('userData'),
       timeoutMs: 7000,
+      runtime: appSettings.speechRuntime || 'cli',
       modelPreference: appSettings.speechCommandModel || 'tiny.en'
     });
     const normalizedTranscript = normalizeSpeechTranscript(whisperResult.transcript);
@@ -2144,6 +2527,14 @@ ipcMain.handle('save-settings', (event, settings) => {
 
   if (Object.prototype.hasOwnProperty.call(settings, 'voiceHotkey')) {
     registerVoiceHotkey();
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(settings, 'speechRuntime') ||
+    Object.prototype.hasOwnProperty.call(settings, 'speechCommandModel')
+  ) {
+    updateSpeechRuntimeConfig();
+    broadcastSpeechState();
   }
 
   persistAppSettings();

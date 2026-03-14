@@ -1,6 +1,6 @@
 {
   "name": "streamvoice",
-  "version": "1.1.0-beta.14",
+  "version": "1.1.0-beta.15",
   "description": "Professional voice control for OBS Studio",
   "main": "main.js",
   "scripts": {
@@ -10,7 +10,11 @@
     "dist": "electron-builder",
     "postinstall": "electron-builder install-app-deps"
   },
-  "keywords": ["obs", "voice-control", "streaming"],
+  "keywords": [
+    "obs",
+    "voice-control",
+    "streaming"
+  ],
   "author": "StreamVoice Team",
   "license": "MIT",
   "devDependencies": {
@@ -19,11 +23,12 @@
     "electron-reload": "^2.0.0-alpha.1"
   },
   "dependencies": {
+    "@kutalia/whisper-node-addon": "^1.1.0",
+    "cors": "^2.8.5",
+    "electron-updater": "^6.1.7",
     "express": "^4.18.2",
     "obs-websocket-js": "^5.0.5",
-    "electron-updater": "^6.1.7",
-    "ws": "^8.14.2",
-    "cors": "^2.8.5"
+    "ws": "^8.14.2"
   },
   "build": {
     "appId": "com.streamvoice.app",

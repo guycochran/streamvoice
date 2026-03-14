@@ -12,6 +12,8 @@ class StreamVoiceEnhanced {
         this.speechState = null;
         this.speechGameMode = true;
         this.workflowProfile = 'basic_live_control';
+        this.sceneMappings = {};
+        this.voiceDictionary = {};
         this.currentMicLevel = 0;
         this.voiceInputMode = 'push_to_talk';
         this.activeVoicePointerId = null;
@@ -92,10 +94,14 @@ class StreamVoiceEnhanced {
             this.voiceInputMode = settings.speechInputMode || 'push_to_talk';
             this.speechGameMode = settings.speechGameMode !== false;
             this.workflowProfile = settings.workflowProfile || 'basic_live_control';
+            this.sceneMappings = settings.sceneMappings || {};
+            this.voiceDictionary = settings.voiceDictionary || {};
         } catch (_error) {
             this.voiceInputMode = 'push_to_talk';
             this.speechGameMode = true;
             this.workflowProfile = 'basic_live_control';
+            this.sceneMappings = {};
+            this.voiceDictionary = {};
         }
 
         this.updateVoiceModeUI();
@@ -698,6 +704,37 @@ class StreamVoiceEnhanced {
         }
     }
 
+    getResolvedSlotSummary() {
+        const mappingEntries = [
+            ['starting', 'Starting'],
+            ['ending', 'Ending'],
+            ['brb', 'Break'],
+            ['raid', 'Focus'],
+            ['gameplay', 'Gameplay']
+        ];
+
+        const mapped = mappingEntries.map(([key, label]) => {
+            const value = this.sceneMappings?.[key];
+            return `${label}: ${value || 'Auto-detect'}`;
+        });
+
+        const aliasEntries = ['camera1', 'camera2', 'camera3', 'camera4', 'powerpoint', 'browser', 'pip', 'brb']
+            .map((key) => {
+                const aliases = this.voiceDictionary?.sceneAliases?.[key];
+                if (!Array.isArray(aliases) || !aliases.length) {
+                    return null;
+                }
+
+                return `${key}: ${aliases.join(', ')}`;
+            })
+            .filter(Boolean);
+
+        return {
+            mapped,
+            aliases: aliasEntries
+        };
+    }
+
     renderDiagnostics() {
         const backendStatus = document.getElementById('backend-status');
         const transportStatus = document.getElementById('transport-status');
@@ -732,6 +769,9 @@ class StreamVoiceEnhanced {
                 `OBS 4455: ${this.obsConnected ? 'connected' : 'not connected'}`,
                 `OBS URL: ${this.debugStatus?.obsWebSocketUrl || 'unknown'}`,
                 `Speech Provider: ${this.speechState?.provider || 'unknown'}`,
+                `Speech Runtime: ${this.speechState?.runtime || 'unknown'}${this.speechState?.runtimeStatus ? ` (${this.speechState.runtimeStatus})` : ''}`,
+                `Speech Runtime Requested: ${this.speechState?.runtimeRequested || this.speechState?.runtime || 'unknown'}`,
+                `Speech Runtime Note: ${this.speechState?.runtimeMessage || 'none'}`,
                 `Speech Mode: ${this.voiceInputMode === 'latched' ? 'latched' : 'push_to_talk'}`,
                 `Speech Model: ${this.speechState?.model || 'unknown'} (${this.speechState?.modelStatus || 'unknown'})`,
                 `Selected Mic: ${this.speechState?.selectedMicLabel || 'System Default Microphone'}`,
@@ -746,10 +786,15 @@ class StreamVoiceEnhanced {
                 `Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'}ms`,
                 `Last Whisper Model: ${this.speechState?.lastWhisperModel || 'unknown'}`,
                 `Last Whisper Binary: ${this.speechState?.lastWhisperBinaryPath || 'unknown'}`,
+                `Last Whisper Runtime: ${this.speechState?.lastWhisperRuntimeResolved || 'unknown'}${this.speechState?.lastWhisperRuntimeRequested ? ` (requested ${this.speechState.lastWhisperRuntimeRequested})` : ''}`,
                 `Last Whisper Audio Path: ${this.speechState?.lastWhisperAudioPath || 'none'}`,
                 `Last Whisper Attempts: ${this.speechState?.lastWhisperAttemptCount ?? 0}`,
                 `Last Whisper Fallback: ${this.speechState?.lastWhisperFallbackUsed ? 'yes' : 'no'}`,
+                `Last Whisper Fallback Reason: ${this.speechState?.lastWhisperRuntimeFallbackReason || 'none'}`,
                 `Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 160)}`,
+                `Last Speech Intent: ${this.speechState?.lastCommand || 'none'}`,
+                `Last Speech Corrections: ${(this.speechState?.lastCorrections || []).map((entry) => `${entry.from || '?'}=>${entry.to || entry.replacement || '?'}`).join('; ') || 'none'}`,
+                `Last Speech Safety: ${this.speechState?.lastSafetyDecision || 'none'}`,
                 `Server PID: ${this.debugStatus?.pid || 'unknown'}`,
                 `Uptime: ${this.debugStatus?.uptimeSeconds ?? 'unknown'}s`,
                 `Last OBS error: ${this.debugStatus?.lastObsError || 'none'}`,
@@ -920,6 +965,7 @@ class StreamVoiceEnhanced {
 
         const connectionInfo = document.getElementById('connection-info');
         if (connectionInfo) {
+            const slotSummary = this.getResolvedSlotSummary();
             connectionInfo.textContent = [
                 `Server URL: ${this.apiBaseUrl}`,
                 `WebSocket URL: ws://${new URL(this.apiBaseUrl).hostname}:8090`,
@@ -928,7 +974,9 @@ class StreamVoiceEnhanced {
                 `OBS Connected: ${this.obsConnected ? 'Yes' : 'No'}`,
                 `Speech Provider: ${this.speechState?.provider || speechHealth.engine || 'unknown'}`,
                 `Speech Mode: ${this.voiceInputMode}`,
-                `Selected Mic: ${this.speechState?.selectedMicLabel || micHealth.selectedMicLabel || 'System Default Microphone'}`
+                `Selected Mic: ${this.speechState?.selectedMicLabel || micHealth.selectedMicLabel || 'System Default Microphone'}`,
+                `Scene Slots: ${slotSummary.mapped.join(' | ')}`,
+                `Priority Aliases: ${slotSummary.aliases.join(' | ') || 'none'}`
             ].join('\n');
         }
 
@@ -1432,6 +1480,9 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Status: ${speech.status || 'unknown'}
   Engine: ${speech.engine || 'unknown'}
   Supported: ${speech.supported !== null ? (speech.supported ? 'Yes' : 'No') : 'unknown'}
+  Runtime: ${this.speechState?.runtime || 'unknown'}${this.speechState?.runtimeStatus ? ` (${this.speechState.runtimeStatus})` : ''}
+  Runtime Requested: ${this.speechState?.runtimeRequested || this.speechState?.runtime || 'unknown'}
+  Runtime Note: ${this.speechState?.runtimeMessage || 'none'}
   Mode: ${this.voiceInputMode === 'latched' ? 'latched' : 'push_to_talk'}
   Model: ${this.speechState?.model || speech.model || 'unknown'}
   Model Status: ${this.speechState?.modelStatus || speech.modelStatus || 'unknown'}
@@ -1446,11 +1497,16 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
   Last Whisper Duration: ${this.speechState?.lastWhisperDurationMs ?? 'unknown'} ms
   Last Whisper Model: ${this.speechState?.lastWhisperModel || 'unknown'}
   Last Whisper Binary: ${this.speechState?.lastWhisperBinaryPath || 'unknown'}
+  Last Whisper Runtime: ${this.speechState?.lastWhisperRuntimeResolved || 'unknown'}${this.speechState?.lastWhisperRuntimeRequested ? ` (requested ${this.speechState.lastWhisperRuntimeRequested})` : ''}
   Last Whisper Audio Path: ${this.speechState?.lastWhisperAudioPath || 'none'}
   Last Whisper Attempts: ${this.speechState?.lastWhisperAttemptCount ?? 0}
   Last Whisper Fallback: ${this.speechState?.lastWhisperFallbackUsed ? 'yes' : 'no'}
+  Last Whisper Fallback Reason: ${this.speechState?.lastWhisperRuntimeFallbackReason || 'none'}
   Last Whisper StdErr: ${(this.speechState?.lastWhisperStderr || 'none').slice(0, 200)}
   Last Transcript: ${this.speechState?.transcript || 'none'}
+  Last Intent: ${this.speechState?.lastCommand || 'none'}
+  Last Corrections: ${(this.speechState?.lastCorrections || []).map((entry) => `${entry.from || '?'}=>${entry.to || entry.replacement || '?'}`).join('; ') || 'none'}
+  Last Safety Decision: ${this.speechState?.lastSafetyDecision || 'none'}
   Last Error: ${this.speechState?.lastError || speech.lastError || 'none'}
 `;
 
@@ -1467,6 +1523,15 @@ Overall Status: ${this.healthStatus?.status || this.healthStatus?.overall || 'un
                 if (event.model) parts.push(`model=${event.model}`);
                 if (event.attempt) parts.push(`attempt=${event.attempt}`);
                 if (event.fallbackUsed) parts.push(`fallback=yes`);
+                if (event.intent) parts.push(`intent=${event.intent}`);
+                if (Array.isArray(event.corrections) && event.corrections.length) {
+                    const correctionSummary = event.corrections
+                        .map((entry) => `${entry.from || '?'}=>${entry.to || entry.replacement || '?'}`)
+                        .join('; ');
+                    parts.push(`corrections="${correctionSummary}"`);
+                }
+                if (event.ignored) parts.push('ignored=yes');
+                if (event.safetyDecision) parts.push(`safety=${event.safetyDecision}`);
                 if (event.error) parts.push(`error="${event.error}"`);
                 if (event.message) parts.push(`msg="${event.message}"`);
                 report += `  ${parts.join(' ')}\n`;
