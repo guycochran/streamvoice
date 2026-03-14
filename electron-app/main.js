@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.16',
+          message: 'StreamVoice v1.1.0-beta.17',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1374,6 +1374,20 @@ function parseScenePreviewCommand(transcript) {
   return `preview ${target}`;
 }
 
+function parseSceneCutCommand(transcript) {
+  const match = transcript.match(/\bcut\b\s+(?:to\s+)?(.+)$/);
+  if (!match) {
+    return '';
+  }
+
+  const target = resolveSceneCommandTarget(match[1]);
+  if (!target) {
+    return '';
+  }
+
+  return `cut to ${target}`;
+}
+
 function parseDirectSceneReference(transcript) {
   const knownScenes = Array.isArray(desktopObsState.scenes) ? desktopObsState.scenes : [];
   for (const sceneName of knownScenes) {
@@ -1524,10 +1538,6 @@ function parseDesktopIntent(transcript) {
     };
   }
 
-  if (hasStandaloneWord(activeTranscript, 'cut')) {
-    return { transcript: activeTranscript, command: 'cut', intent: 'studio_cut', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_cut' };
-  }
-
   const explicitCameraSlot = detectCameraSlotFromWords(activeTranscript);
   if (explicitCameraSlot) {
     return {
@@ -1548,6 +1558,21 @@ function parseDesktopIntent(transcript) {
       appliedCorrections: correctionResult.appliedCorrections,
       safetyDecision: 'safe_scene_preview'
     };
+  }
+
+  const cutSceneCommand = parseSceneCutCommand(activeTranscript);
+  if (cutSceneCommand) {
+    return {
+      transcript: activeTranscript,
+      command: cutSceneCommand,
+      intent: 'cut_scene',
+      appliedCorrections: correctionResult.appliedCorrections,
+      safetyDecision: 'safe_scene_cut'
+    };
+  }
+
+  if (hasStandaloneWord(activeTranscript, 'cut')) {
+    return { transcript: activeTranscript, command: 'cut', intent: 'studio_cut', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_cut' };
   }
 
   const sceneCommand = parseSceneSwitchCommand(activeTranscript);
@@ -1903,6 +1928,24 @@ async function desktopCutTransition() {
   return { success: true, message: 'Cut to program' };
 }
 
+async function desktopCutToScene(targetScene) {
+  const previewResult = await desktopPreviewScene(targetScene);
+  if (!previewResult?.success) {
+    return previewResult;
+  }
+
+  const cutResult = await desktopCutTransition();
+  if (!cutResult?.success) {
+    return cutResult;
+  }
+
+  const targetLabel = previewResult.message?.replace(/^Previewing\s+/, '') || targetScene;
+  return {
+    success: true,
+    message: `Cut to ${targetLabel}`
+  };
+}
+
 async function executeDesktopCommand(command) {
   const parsedIntent = parseDesktopIntent(command);
   const normalized = parsedIntent.command;
@@ -1927,6 +1970,8 @@ async function executeDesktopCommand(command) {
     result = await desktopSwitchToScene(normalized.replace(/^switch to\s+/, ''));
   } else if (normalized.startsWith('preview ')) {
     result = await desktopPreviewScene(normalized.replace(/^preview\s+/, ''));
+  } else if (normalized.startsWith('cut to ')) {
+    result = await desktopCutToScene(normalized.replace(/^cut to\s+/, ''));
   } else if (micVolumeMatch) {
     result = await desktopSetVolume('mic', micVolumeMatch[1]);
   } else if (desktopVolumeMatch) {
