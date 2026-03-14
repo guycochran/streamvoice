@@ -24,6 +24,10 @@ function formatWhisperExit(code, stderr) {
     return 'Whisper failed to start because a required Windows DLL/runtime is missing.';
   }
 
+  if (code === 3221225501) {
+    return 'Whisper crashed because the bundled binary requires unsupported CPU instructions on this machine.';
+  }
+
   return stderr.trim() || `Whisper exited with code ${code}`;
 }
 

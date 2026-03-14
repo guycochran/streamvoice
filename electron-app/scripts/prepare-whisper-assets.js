@@ -100,7 +100,14 @@ async function buildWhisperCli() {
   console.log('Configuring whisper.cpp build...');
   const cmakeArgs = ['-S', extractedDir, '-B', buildDir, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=OFF'];
   if (process.platform === 'win32') {
-    cmakeArgs.push('-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded');
+    cmakeArgs.push(
+      '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded',
+      '-DGGML_NATIVE=OFF',
+      '-DGGML_AVX=OFF',
+      '-DGGML_AVX2=OFF',
+      '-DGGML_FMA=OFF',
+      '-DGGML_F16C=OFF'
+    );
   }
   await run('cmake', cmakeArgs);
 
