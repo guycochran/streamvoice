@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.12',
+          message: 'StreamVoice v1.1.0-beta.13',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1137,6 +1137,7 @@ function extractDesktopCommand(transcript) {
   if (appSettings.speechGameMode) {
     if (activeTranscript === 'live' || activeTranscript === 'go' || activeTranscript === 'stream') return 'start stream';
     if (activeTranscript === 'stop') return 'stop stream';
+    if (activeTranscript === 'cut') return 'cut';
     if (activeTranscript === 'break' || activeTranscript === 'brb') return 'switch to break';
     if (activeTranscript === 'gameplay' || activeTranscript === 'game') return 'switch to gameplay';
     if (activeTranscript === 'camera one' || activeTranscript === 'cam one' || activeTranscript === 'one' || activeTranscript === 'won') return 'switch to camera 1';
@@ -1151,6 +1152,7 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('stream starting setup')) return 'stream starting setup';
   if (includesPhrase('stream ending setup')) return 'stream ending setup';
   if (includesPhrase('emergency mute')) return 'emergency mute';
+  if (includesPhrase('cut')) return 'cut';
   if (includesPhrase('subscriber celebration')) return 'subscriber celebration';
   if (includesPhrase('raid mode')) return 'raid mode';
   if (includesPhrase('start streaming') || includesPhrase('start the stream') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
@@ -1461,6 +1463,26 @@ async function desktopStopRecording() {
   return { success: true, message: 'Recording stopped' };
 }
 
+async function desktopCutTransition() {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const studioMode = await desktopObs.call('GetStudioModeEnabled').catch(() => ({ studioModeEnabled: false }));
+  if (!studioMode?.studioModeEnabled) {
+    return { success: false, message: 'Studio Mode is not enabled in OBS' };
+  }
+
+  try {
+    await desktopObs.call('SetCurrentSceneTransition', { transitionName: 'Cut' });
+  } catch (_error) {
+    // If explicit transition switching is unavailable, use the current OBS transition.
+  }
+
+  await desktopObs.call('TriggerStudioModeTransition');
+  return { success: true, message: 'Cut to program' };
+}
+
 async function executeDesktopCommand(command) {
   const normalized = extractDesktopCommand(command);
   const micVolumeMatch = normalized.match(/^mic volume (\d+)\s*percent$/);
@@ -1504,6 +1526,8 @@ async function executeDesktopCommand(command) {
     result = await desktopSetMute('mic', false);
   } else if (normalized === 'take screenshot' || normalized === 'screenshot') {
     result = await desktopTakeScreenshot();
+  } else if (normalized === 'cut') {
+    result = await desktopCutTransition();
   } else if (normalized === 'emergency mute') {
     await desktopSetMute('mic', true);
     try {

@@ -38,9 +38,6 @@ class StreamVoiceEnhanced {
         this.commandCategories = document.getElementById('command-categories');
         this.currentSceneElement = document.getElementById('current-scene');
         this.sceneCountElement = document.getElementById('scene-count');
-        this.gameModeIndicator = document.getElementById('game-mode-indicator');
-        this.gameModeLabel = document.getElementById('game-mode-label');
-
         this.init();
     }
 
@@ -99,7 +96,6 @@ class StreamVoiceEnhanced {
         }
 
         this.updateVoiceModeUI();
-        this.updateGameModeIndicator();
     }
 
     connectWebSocket() {
@@ -501,19 +497,6 @@ class StreamVoiceEnhanced {
         }
     }
 
-    updateGameModeIndicator() {
-        if (!this.gameModeIndicator || !this.gameModeLabel) {
-            return;
-        }
-
-        const enabled = this.speechGameMode !== false;
-        this.gameModeIndicator.classList.toggle('active', enabled);
-        this.gameModeLabel.textContent = enabled ? 'Low Latency' : 'Standard Mode';
-        this.gameModeIndicator.title = enabled
-            ? 'Low Latency Mode is active'
-            : 'Standard voice mode is active';
-    }
-
     startListening() {
         if (!this.isListening && this.hasDesktopBridge && window.electronAPI?.speechStartPushToTalk) {
             this.isListening = true;
@@ -662,14 +645,14 @@ class StreamVoiceEnhanced {
     updateConnectionStatus() {
         const statusText = this.connectionStatus.querySelector('.status-text');
         let status = 'disconnected';
-        let label = 'Disconnected';
+        let label = 'Offline';
 
-        if (this.serverReachable && this.wsConnected) {
+        if (this.serverReachable && this.obsConnected) {
             status = 'connected';
-            label = 'Connected';
+            label = 'Ready';
         } else if (this.serverReachable) {
             status = 'connected';
-            label = 'HTTP Only';
+            label = 'OBS Setup Needed';
         }
 
         this.connectionStatus.className = 'status ' + status;
@@ -677,9 +660,14 @@ class StreamVoiceEnhanced {
         this.voiceButton.disabled = !this.serverReachable;
 
         if (this.connectionDetails) {
-            const transport = this.wsConnected ? 'WS+HTTP' : (this.serverReachable ? 'HTTP fallback' : 'offline');
-            const obs = this.obsConnected ? 'OBS connected' : 'OBS not connected';
-            this.connectionDetails.textContent = `Transport: ${transport} | ${obs}`;
+            if (!this.serverReachable) {
+                this.connectionDetails.textContent = 'Local control service is offline.';
+            } else if (!this.obsConnected) {
+                this.connectionDetails.textContent = 'Connect OBS to enable live voice control.';
+            } else {
+                const mode = this.speechGameMode !== false ? 'Low Latency' : 'Balanced';
+                this.connectionDetails.textContent = `OBS connected • ${mode} voice mode • Ready for live control.`;
+            }
         }
     }
 
@@ -978,12 +966,31 @@ class StreamVoiceEnhanced {
     async loadCommandCategories() {
         if (this.hasDesktopBridge) {
             this.displayCommandCategories({
-                scenes: ['switch to gameplay', 'switch to starting', 'switch to break', 'switch to camera 1'],
+                scenes: [
+                    'switch to camera 1',
+                    'switch to camera 2',
+                    'switch to break',
+                    'switch to gameplay',
+                    'switch to powerpoint',
+                    'go to camera 1',
+                    'go to powerpoint'
+                ],
                 recording: ['start recording', 'stop recording', 'stop the record'],
-                streaming: ['start streaming', 'stop stream'],
-                audio: ['mute mic', 'unmute mic', 'turn up the mic', 'turn down the mic', 'turn up desktop', 'turn down desktop'],
-                macros: ['stream starting setup', 'stream ending setup', 'emergency mute', 'switch to break', 'switch to camera 1'],
-                other: ['take screenshot']
+                streaming: ['start stream', 'stop stream', 'go live', 'start session', 'end session'],
+                audio: [
+                    'mute mic',
+                    'unmute mic',
+                    'turn up the mic',
+                    'turn down the mic',
+                    'turn up my mic',
+                    'turn up desktop',
+                    'turn down desktop',
+                    'turn up the audio',
+                    'turn down the audio'
+                ],
+                studio: ['cut'],
+                actions: ['stream starting setup', 'stream ending setup', 'emergency mute', 'take screenshot'],
+                other: ['switch to end scene', 'switch to starting']
             });
             return;
         }
