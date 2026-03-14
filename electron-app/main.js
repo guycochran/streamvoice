@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.13',
+          message: 'StreamVoice v1.1.0-beta.14',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1800,6 +1800,7 @@ let appSettings = {
   startWithWindows: false,
   minimizeToTray: true,
   autoConnect: true,
+  workflowProfile: 'basic_live_control',
   speechInputMode: 'push_to_talk',
   speechCommandModel: 'tiny.en',
   speechGameMode: true,

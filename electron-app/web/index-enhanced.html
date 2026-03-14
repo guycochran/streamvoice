@@ -306,7 +306,7 @@
                     <button class="macro-button" onclick="executeCommand('switch to camera 1')">
                         🎥 Camera 1
                     </button>
-                    <button class="macro-button" onclick="executeCommand('cut')">
+                    <button class="macro-button" onclick="executeCommand('cut')" data-studio-only style="display: none;">
                         ✂️ Cut
                     </button>
                     <button class="macro-button" onclick="executeCommand('emergency mute')">
@@ -492,6 +492,22 @@
             <div id="settings-tab" class="tab-content">
                 <h3>Settings</h3>
                 <p style="color: #666; margin-bottom: 20px;">Configure StreamVoice and OBS connection settings</p>
+
+                <div class="settings-section">
+                    <h4>Workflow Profile</h4>
+                    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <div style="margin-bottom: 15px;">
+                            <label for="workflow-profile" style="display: block; margin-bottom: 5px; color: #9b59b6;">Operating Mode:</label>
+                            <select id="workflow-profile" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;">
+                                <option value="basic_live_control">Basic Live Control</option>
+                                <option value="studio_workflow">Studio Workflow</option>
+                            </select>
+                        </div>
+                        <div id="workflow-profile-status" style="font-size: 13px; color: #b9c0d0;">
+                            Basic Live Control keeps the app focused on direct voice commands and quick actions.
+                        </div>
+                    </div>
+                </div>
 
                 <div class="settings-section">
                     <h4>Microphone Selection</h4>
@@ -898,6 +914,8 @@
         async function saveAppPreferences() {
             const select = document.getElementById('mic-device');
             const status = document.getElementById('mic-device-status');
+            const workflowSelect = document.getElementById('workflow-profile');
+            const workflowStatus = document.getElementById('workflow-profile-status');
             const hotkeyInput = document.getElementById('voice-hotkey');
             const hotkeyStatus = document.getElementById('voice-hotkey-status');
             const modelSelect = document.getElementById('speech-command-model');
@@ -920,6 +938,7 @@
 
             try {
                 await window.electronAPI.saveSettings({
+                    workflowProfile: workflowSelect?.value || 'basic_live_control',
                     preferredMicDeviceId: select.value || '',
                     preferredMicLabel: selectedOption?.textContent || '',
                     speechCommandModel: modelSelect?.value || 'tiny.en',
@@ -930,6 +949,11 @@
                 status.textContent = select.value
                     ? `Saved microphone: ${selectedOption.textContent}`
                     : 'Saved microphone preference: System Default Microphone';
+                if (workflowStatus) {
+                    workflowStatus.textContent = workflowSelect?.value === 'studio_workflow'
+                        ? 'Studio Workflow saved. Preview/Program controls can be enabled for advanced production.'
+                        : 'Basic Live Control saved. The app will stay focused on direct voice control and quick actions.';
+                }
                 if (hotkeyStatus) {
                     hotkeyStatus.textContent = hotkeyInput?.value?.trim()
                         ? `Saved global voice hotkey: ${hotkeyInput.value.trim()}`
@@ -945,9 +969,19 @@
                         ? 'Game mode saved. Short commands will snap faster during gameplay.'
                         : 'Game mode disabled. Speech will stay more literal.';
                 }
+                if (window.streamVoice) {
+                    window.streamVoice.workflowProfile = workflowSelect?.value || 'basic_live_control';
+                    window.streamVoice.speechGameMode = Boolean(gameModeInput?.checked);
+                    window.streamVoice.updateWorkflowProfileUI?.();
+                    window.streamVoice.loadCommandCategories?.();
+                    window.streamVoice.updateConnectionStatus?.();
+                }
                 document.getElementById('scene-mapping-status').textContent = 'Saved scene mapping preferences.';
             } catch (error) {
                 status.textContent = `Failed to save microphone selection: ${error.message}`;
+                if (workflowStatus) {
+                    workflowStatus.textContent = `Failed to save workflow profile: ${error.message}`;
+                }
                 if (hotkeyStatus) {
                     hotkeyStatus.textContent = `Failed to save voice hotkey: ${error.message}`;
                 }
@@ -1072,6 +1106,10 @@
                     const hotkeyInput = document.getElementById('voice-hotkey');
                     if (hotkeyInput) {
                         hotkeyInput.value = settings.voiceHotkey || '';
+                    }
+                    const workflowSelect = document.getElementById('workflow-profile');
+                    if (workflowSelect) {
+                        workflowSelect.value = settings.workflowProfile || 'basic_live_control';
                     }
                     const modelSelect = document.getElementById('speech-command-model');
                     if (modelSelect) {

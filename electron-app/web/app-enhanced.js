@@ -11,6 +11,7 @@ class StreamVoiceEnhanced {
         this.hasDesktopBridge = Boolean(window.electronAPI?.desktopGetStatus);
         this.speechState = null;
         this.speechGameMode = true;
+        this.workflowProfile = 'basic_live_control';
         this.currentMicLevel = 0;
         this.voiceInputMode = 'push_to_talk';
         this.activeVoicePointerId = null;
@@ -90,12 +91,15 @@ class StreamVoiceEnhanced {
             const settings = await window.electronAPI.getSettings();
             this.voiceInputMode = settings.speechInputMode || 'push_to_talk';
             this.speechGameMode = settings.speechGameMode !== false;
+            this.workflowProfile = settings.workflowProfile || 'basic_live_control';
         } catch (_error) {
             this.voiceInputMode = 'push_to_talk';
             this.speechGameMode = true;
+            this.workflowProfile = 'basic_live_control';
         }
 
         this.updateVoiceModeUI();
+        this.updateWorkflowProfileUI();
     }
 
     connectWebSocket() {
@@ -964,8 +968,9 @@ class StreamVoiceEnhanced {
     }
 
     async loadCommandCategories() {
+        const studioWorkflow = this.workflowProfile === 'studio_workflow';
         if (this.hasDesktopBridge) {
-            this.displayCommandCategories({
+            const categories = {
                 scenes: [
                     'switch to camera 1',
                     'switch to camera 2',
@@ -988,10 +993,13 @@ class StreamVoiceEnhanced {
                     'turn up the audio',
                     'turn down the audio'
                 ],
-                studio: ['cut'],
                 actions: ['stream starting setup', 'stream ending setup', 'emergency mute', 'take screenshot'],
                 other: ['switch to end scene', 'switch to starting']
-            });
+            };
+            if (studioWorkflow) {
+                categories.studio = ['cut'];
+            }
+            this.displayCommandCategories(categories);
             return;
         }
 
@@ -1005,6 +1013,13 @@ class StreamVoiceEnhanced {
         } catch (error) {
             console.error('Failed to load command categories:', error);
         }
+    }
+
+    updateWorkflowProfileUI() {
+        const studioEnabled = this.workflowProfile === 'studio_workflow';
+        document.querySelectorAll('[data-studio-only]').forEach((element) => {
+            element.style.display = studioEnabled ? '' : 'none';
+        });
     }
 
     displayCommandCategories(categories) {
