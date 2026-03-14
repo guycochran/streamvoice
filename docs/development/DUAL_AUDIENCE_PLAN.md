@@ -78,6 +78,11 @@ Every audience wants the same core trust signals:
 - what action ran
 - what failed
 
+To support broader natural language without losing trust, the product also needs:
+- intent parsing
+- slot-based execution
+- clearer interpretation diagnostics
+
 Why it matters:
 - gamers want speed and confidence
 - non-gamers want professionalism and predictability

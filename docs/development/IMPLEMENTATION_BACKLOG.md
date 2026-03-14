@@ -352,6 +352,37 @@ This backlog translates the product analysis and roadmap into concrete execution
     - presentation / browser / PiP
   - presets can populate scenes, aliases, and macro suggestions
 
+### SV-026: Natural Language Intent Parser
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - common phrasing resolves through intents and slots instead of ad hoc phrase checks
+- Acceptance criteria:
+  - parser distinguishes:
+    - intent
+    - target slot
+    - optional value
+  - supports natural variants like:
+    - `go to`
+    - `switch to`
+    - `show`
+    - `bring up`
+  - numbered camera phrasing resolves deterministically
+
+### SV-027: Structured Speech Interpretation Diagnostics
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - diagnostics show how speech was interpreted before execution
+- Acceptance criteria:
+  - show:
+    - raw transcript
+    - parsed intent
+    - parsed slot
+    - parsed value
+    - execution result
+  - ambiguity or parse failures are visible to users and testers
+
 ## P1: Product Validation
 
 ### SV-019: Real User Test Plan
