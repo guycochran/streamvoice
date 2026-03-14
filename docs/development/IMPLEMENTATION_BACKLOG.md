@@ -238,6 +238,71 @@ This backlog translates the product analysis and roadmap into concrete execution
 - Acceptance criteria:
   - app can query and display the current OBS scene list when connected
   - user can choose scenes/targets from a visible picker or dropdown
+
+### SV-019: Scene Slot Mapping Model
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - StreamVoice uses explicit named scene slots as the primary trust model
+- Acceptance criteria:
+  - app stores named slots like:
+    - `starting`
+    - `ending`
+    - `break`
+    - `gameplay`
+    - `focus`
+    - `camera1` through `camera4`
+    - `slides`
+    - `browser`
+    - `pip`
+  - each slot can map to one explicit OBS scene
+  - slot mappings persist across restarts
+  - slot mappings show whether they were manually confirmed or auto-detected
+
+### SV-020: Scene Setup Wizard
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - first-run or on-demand guided setup for microphones, OBS, and confirmed scene slots
+- Acceptance criteria:
+  - user can review proposed scene matches from the live OBS scene list
+  - user can confirm or override each proposed slot match
+  - wizard saves the final slot mapping
+  - setup includes at least one voice test against a confirmed slot
+
+### SV-021: Scene Alias Editor
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - users can teach StreamVoice natural aliases for confirmed scene slots
+- Acceptance criteria:
+  - aliases are editable per slot
+  - aliases persist across restarts
+  - slot aliases are evaluated before generic fuzzy scene matching
+
+### SV-022: Template Packs And Starter Layouts
+- Priority: `P1`
+- Target version: `v1.3.0`
+- Outcome:
+  - users can start from a curated slot template instead of a blank configuration
+- Acceptance criteria:
+  - includes starter packs for:
+    - gaming
+    - podcast
+    - presentation
+    - live event
+  - template packs populate slot names and suggested matches
+  - users can still edit all mappings before saving
+
+### SV-023: Strict Confidence Rules For High-Risk Scene Commands
+- Priority: `P1`
+- Target version: `v1.2.0`
+- Outcome:
+  - high-risk scene commands are deterministic and do not silently guess
+- Acceptance criteria:
+  - numbered camera commands require matching number tokens
+  - ambiguous scene requests fail clearly instead of drifting to a weak match
+  - explicit slot mappings override fuzzy scene inference
   - built-in actions like `Raid Mode`, `Start Stream`, and scene switches use the saved mapping
   - mappings support non-stream scenes such as cameras, browser, and presentation layouts
   - mappings persist across restarts

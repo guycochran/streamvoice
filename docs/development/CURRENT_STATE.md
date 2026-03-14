@@ -52,11 +52,12 @@ Renderer role:
 
 1. beta hardening
 2. command alias coverage
-3. hotkey UX polish
-4. diagnostics wording cleanup
-5. beta tester readiness
-6. macOS recorder sidecar
-7. optional wake-word mode later
+3. deterministic scene slot mapping and setup confirmation
+4. hotkey UX polish
+5. diagnostics wording cleanup
+6. beta tester readiness
+7. macOS recorder sidecar
+8. optional wake-word mode later
 
 ## Beta Tester Readiness
 
@@ -65,7 +66,16 @@ Before widening beta access, the app should feel solid in these areas:
 - stable command feedback for start/stop stream, mute/unmute, scene switch, screenshot
 - clearer diagnostics with fewer placeholder states
 - reliable microphone selection and hotkey setup
-- basic streamer mappings for scenes like `PiP`, `Camera 1`, `Browser`, `Chat`, and `PowerPoint`
+- confirmed scene slot mappings for scenes like `PiP`, `Camera 1`, `Browser`, `Chat`, and `PowerPoint`
+- no trust-breaking camera-number drift between mapped scenes
+
+## Next Trust Layer
+
+The next major reliability step is replacing long-term fuzzy scene guessing with:
+- explicit scene slots
+- guided setup confirmation
+- user-editable slot aliases
+- stricter confidence rules for numbered and high-risk scene commands
 
 ## Wake Word Direction
 
