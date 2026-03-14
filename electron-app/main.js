@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.9',
+          message: 'StreamVoice v1.1.0-beta.10',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1117,11 +1117,11 @@ function extractDesktopCommand(transcript) {
     return `desktop volume ${desktopVolumeMatch[1]} percent`;
   }
 
-  if (/\b(turn|move|bring)\s+(up|down)\s+(the\s+)?mic\b/.test(activeTranscript)) {
+  if (/\b(turn|move|bring)\s+(up|down)\s+((the|my)\s+)?mic(rophone)?\b/.test(activeTranscript)) {
     return activeTranscript.includes('down') ? 'mic volume down step' : 'mic volume up step';
   }
 
-  if (/\b(turn|move|bring)\s+(up|down)\s+(the\s+)?desktop\b/.test(activeTranscript)) {
+  if (/\b(turn|move|bring)\s+(up|down)\s+((the|my)\s+)?(desktop|audio)\b/.test(activeTranscript)) {
     return activeTranscript.includes('down') ? 'desktop volume down step' : 'desktop volume up step';
   }
 
@@ -1146,8 +1146,8 @@ function extractDesktopCommand(transcript) {
   if (includesPhrase('raid mode')) return 'raid mode';
   if (includesPhrase('start streaming') || includesPhrase('start the stream') || includesPhrase('start stream') || includesPhrase('go live')) return 'start stream';
   if (includesPhrase('stop streaming') || includesPhrase('stop the stream') || includesPhrase('stop stream') || includesPhrase('end the stream') || includesPhrase('end stream')) return 'stop stream';
-  if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) return 'record';
   if (includesPhrase('stop recording') || includesPhrase('stop the recording') || includesPhrase('stop the record') || includesPhrase('end recording')) return 'stop recording';
+  if (includesPhrase('start recording') || includesPhrase('start the recording') || includesPhrase('record')) return 'record';
   if (includesPhrase('take screenshot') || includesPhrase('screenshot')) return 'screenshot';
   if (includesPhrase('unmute the microphone') || includesPhrase('unmute the mic')) return 'unmute';
   if (includesPhrase('unmute microphone') || includesPhrase('unmute mic') || includesPhrase('unmute my mic') || includesPhrase('unmute')) return 'unmute';
