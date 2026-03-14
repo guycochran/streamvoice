@@ -410,7 +410,7 @@ This backlog translates the product analysis and roadmap into concrete execution
 
 ## P1: Product Validation
 
-### SV-019: Real User Test Plan
+### SV-030: Real User Test Plan
 - Priority: `P1`
 - Target version: `v1.1.0`
 - Outcome:
@@ -419,7 +419,7 @@ This backlog translates the product analysis and roadmap into concrete execution
   - at least 3 real users run guided tests
   - issues categorized by setup, reliability, latency, and clarity
 
-### SV-020: Operator Confidence Survey
+### SV-031: Operator Confidence Survey
 - Priority: `P1`
 - Target version: `v1.2.0`
 - Outcome:
@@ -433,7 +433,7 @@ This backlog translates the product analysis and roadmap into concrete execution
 
 ## P2: Platform And Expansion
 
-### SV-021: Internal State Model Refactor
+### SV-032: Internal State Model Refactor
 - Priority: `P2`
 - Target version: `v2.0.0`
 - Outcome:
@@ -442,7 +442,7 @@ This backlog translates the product analysis and roadmap into concrete execution
   - app state is modeled explicitly
   - transport and UI state are not inferred indirectly from each other
 
-### SV-022: Integration Architecture
+### SV-033: Integration Architecture
 - Priority: `P2`
 - Target version: `v2.0.0`
 - Outcome:
@@ -454,7 +454,7 @@ This backlog translates the product analysis and roadmap into concrete execution
     - webhook triggers
     - additional action providers
 
-### SV-021: Creator Templates
+### SV-034: Creator Templates
 - Priority: `P2`
 - Target version: `v1.4.0`
 - Outcome:

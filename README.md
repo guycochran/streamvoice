@@ -13,9 +13,10 @@ Working in packaged Windows builds:
 - scene inventory and scene mapping
 - microphone selection and VU metering
 - configurable global voice hotkey
+- workflow profiles for basic live control and studio-style operation
 
 Current app version in repo:
-- `1.1.0-beta.7`
+- `1.1.0-beta.14`
 
 For a concise engineering snapshot, start with [docs/development/CURRENT_STATE.md](docs/development/CURRENT_STATE.md).
 
@@ -47,6 +48,7 @@ Active production path:
 
 - beta hardening
 - command alias coverage
+- deterministic scene slots and setup confirmation
 - hotkey UX polish
 - diagnostics cleanup
 - optional wake-word mode later

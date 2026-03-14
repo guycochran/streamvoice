@@ -5,7 +5,7 @@
 StreamVoice is now in the beta stabilization phase.
 
 Current app version in repo:
-- `1.1.0-beta.7`
+- `1.1.0-beta.14`
 
 Core promise now proven in packaged Windows builds:
 - native voice capture works
@@ -45,8 +45,11 @@ Renderer role:
 - configurable global voice hotkey
 - fast command mode with `tiny.en`
 - optional balanced mode with `base.en`
-- gameplay voice profile
+- workflow profiles:
+  - `Basic Live Control`
+  - `Studio Workflow`
 - scene mapping UI
+- expanded natural command coverage for scene switching and audio actions
 
 ## Current Priorities
 
@@ -68,6 +71,15 @@ Before widening beta access, the app should feel solid in these areas:
 - reliable microphone selection and hotkey setup
 - confirmed scene slot mappings for scenes like `PiP`, `Camera 1`, `Browser`, `Chat`, and `PowerPoint`
 - no trust-breaking camera-number drift between mapped scenes
+
+Current recommendation:
+- invite a small closed beta now
+- keep it guided and feedback-heavy
+- prioritize testers who can report on:
+  - noisy-home voice use
+  - multi-camera switching
+  - setup clarity
+  - operator trust
 
 ## Next Trust Layer
 
