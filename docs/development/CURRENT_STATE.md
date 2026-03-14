@@ -5,7 +5,7 @@
 StreamVoice is now in the beta stabilization phase.
 
 Current app version in repo:
-- `1.1.0-beta.19`
+- `1.1.0-beta.20`
 
 Core promise now proven in packaged Windows builds:
 - native voice capture works

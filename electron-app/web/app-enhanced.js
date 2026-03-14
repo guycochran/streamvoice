@@ -1022,11 +1022,15 @@ class StreamVoiceEnhanced {
                 scenes: [
                     'switch to camera 1',
                     'switch to camera 2',
+                    'switch to camera 3',
+                    'switch to camera 4',
                     'switch to break',
                     'switch to gameplay',
                     'switch to powerpoint',
                     'go to camera 1',
-                    'go to powerpoint'
+                    'go to powerpoint',
+                    'preview camera 1',
+                    'preview 2'
                 ],
                 recording: ['start recording', 'stop recording', 'stop the record'],
                 streaming: ['start stream', 'stop stream', 'go live', 'start session', 'end session'],
@@ -1036,6 +1040,7 @@ class StreamVoiceEnhanced {
                     'turn up the mic',
                     'turn down the mic',
                     'turn up my mic',
+                    'turn down my mic',
                     'turn up desktop',
                     'turn down desktop',
                     'turn up the audio',
@@ -1045,7 +1050,16 @@ class StreamVoiceEnhanced {
                 other: ['switch to end scene', 'switch to starting']
             };
             if (studioWorkflow) {
-                categories.studio = ['cut'];
+                categories.studio = [
+                    'preview camera 1',
+                    'preview 2',
+                    'cut',
+                    'cut to camera 1',
+                    'cut to powerpoint',
+                    'fade',
+                    'fade to powerpoint',
+                    'fade to black'
+                ];
             }
             this.displayCommandCategories(categories);
             return;
@@ -1076,11 +1090,17 @@ class StreamVoiceEnhanced {
 
         container.innerHTML = '';
 
-        for (const [category, commands] of Object.entries(categories)) {
-            if (commands.length === 0) continue;
+        const orderedEntries = Object.entries(categories);
+        orderedEntries.forEach(([category, commands], index) => {
+            if (commands.length === 0) return;
 
             const categoryDiv = document.createElement('div');
             categoryDiv.className = 'category';
+            if (index > 0 && category.toLowerCase() === 'studio') {
+                categoryDiv.style.borderTop = '1px solid rgba(255,255,255,0.12)';
+                categoryDiv.style.paddingTop = '18px';
+                categoryDiv.style.marginTop = '18px';
+            }
 
             const title = document.createElement('h4');
             title.textContent = category.charAt(0).toUpperCase() + category.slice(1);
@@ -1099,7 +1119,7 @@ class StreamVoiceEnhanced {
 
             categoryDiv.appendChild(commandsDiv);
             container.appendChild(categoryDiv);
-        }
+        });
     }
 
     async checkMicrophonePermission() {

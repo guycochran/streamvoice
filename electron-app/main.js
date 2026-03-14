@@ -5,6 +5,7 @@ const OBSWebSocket = require('obs-websocket-js').default;
 const path = require('path');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
+const { GlobalKeyboardListener } = require('node-global-key-listener');
 const { SpeechService } = require('./services/speech-service');
 const { resolveWhisperRuntimeConfig, transcribeWithWhisperRuntime } = require('./services/whisper-runtime');
 const { NativeSpeechCaptureService } = require('./services/native-speech-capture-service');
@@ -20,6 +21,11 @@ let speechCaptureDirPath;
 const speechUploadSessions = new Map();
 let nativeSpeechCaptureService;
 let registeredVoiceHotkey = null;
+let registeredVoiceHotkeyMode = 'toggle';
+let globalKeyboardListener = null;
+let globalKeyboardListenerHandler = null;
+let registeredVoiceHotkeySpec = null;
+let voiceHotkeyHeld = false;
 let desktopObsReconnectTimer = null;
 let latestSpeechPreviewSequence = 0;
 const speechService = new SpeechService();
@@ -262,7 +268,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.19',
+          message: 'StreamVoice v1.1.0-beta.20',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -490,6 +496,11 @@ function registerVoiceHotkey() {
     return;
   }
 
+  if (globalKeyboardListener && globalKeyboardListenerHandler) {
+    globalKeyboardListener.removeListener(globalKeyboardListenerHandler);
+    globalKeyboardListenerHandler = null;
+  }
+
   if (registeredVoiceHotkey) {
     globalShortcut.unregister(registeredVoiceHotkey);
     registeredVoiceHotkey = null;
@@ -500,7 +511,59 @@ function registerVoiceHotkey() {
     return;
   }
 
+  const holdSpec = parseVoiceHotkeyAccelerator(accelerator);
   try {
+    if (holdSpec) {
+      if (!globalKeyboardListener) {
+        globalKeyboardListener = new GlobalKeyboardListener({
+          windows: {
+            onError: (errorCode) => {
+              speechService.updateCaptureTelemetry({
+                lastError: `Hotkey listener error: ${errorCode}`
+              });
+              broadcastSpeechState();
+            }
+          }
+        });
+      }
+
+      registeredVoiceHotkeySpec = holdSpec;
+      globalKeyboardListenerHandler = async (event, down) => {
+        if (!registeredVoiceHotkeySpec) {
+          return false;
+        }
+
+        if (event.state === 'DOWN' && matchesVoiceHotkeyDown(event, down, registeredVoiceHotkeySpec)) {
+          if (!voiceHotkeyHeld) {
+            const speechState = speechService.getState();
+            if (!speechState.recording && !speechState.transcribing) {
+              voiceHotkeyHeld = true;
+              await startSpeechCaptureFlow();
+            }
+          }
+        } else if (event.state === 'UP' && voiceHotkeyHeld && isVoiceHotkeyRelease(event, registeredVoiceHotkeySpec)) {
+          voiceHotkeyHeld = false;
+          const speechState = speechService.getState();
+          if (speechState.recording) {
+            await stopSpeechCaptureFlow();
+          }
+        }
+
+        return false;
+      };
+
+      globalKeyboardListener.addListener(globalKeyboardListenerHandler).catch((error) => {
+        speechService.updateCaptureTelemetry({
+          lastError: `Hotkey listener error: ${error.message}`
+        });
+        broadcastSpeechState();
+      });
+
+      registeredVoiceHotkey = accelerator;
+      registeredVoiceHotkeyMode = 'hold_to_talk';
+      return;
+    }
+
     const registered = globalShortcut.register(accelerator, async () => {
       const speechState = speechService.getState();
       if (speechState.recording) {
@@ -515,12 +578,139 @@ function registerVoiceHotkey() {
     }
 
     registeredVoiceHotkey = accelerator;
+    registeredVoiceHotkeyMode = 'toggle';
   } catch (error) {
+    registeredVoiceHotkeyMode = 'toggle';
     speechService.updateCaptureTelemetry({
       lastError: `Hotkey error: ${error.message}`
     });
     broadcastSpeechState();
   }
+}
+
+function parseVoiceHotkeyAccelerator(accelerator) {
+  const parts = String(accelerator || '')
+    .split('+')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  const spec = {
+    ctrl: false,
+    shift: false,
+    alt: false,
+    meta: false,
+    key: null,
+    releaseNames: new Set()
+  };
+
+  const modifierMap = {
+    ctrl: 'ctrl',
+    control: 'ctrl',
+    cmdorctrl: 'ctrl',
+    shift: 'shift',
+    alt: 'alt',
+    option: 'alt',
+    super: 'meta',
+    command: 'meta',
+    cmd: 'meta',
+    meta: 'meta'
+  };
+
+  for (const part of parts) {
+    const normalized = part.toLowerCase();
+    const modifier = modifierMap[normalized];
+    if (modifier) {
+      spec[modifier] = true;
+      if (modifier === 'ctrl') {
+        spec.releaseNames.add('LEFT CTRL');
+        spec.releaseNames.add('RIGHT CTRL');
+      } else if (modifier === 'shift') {
+        spec.releaseNames.add('LEFT SHIFT');
+        spec.releaseNames.add('RIGHT SHIFT');
+      } else if (modifier === 'alt') {
+        spec.releaseNames.add('LEFT ALT');
+        spec.releaseNames.add('RIGHT ALT');
+      } else if (modifier === 'meta') {
+        spec.releaseNames.add('LEFT META');
+        spec.releaseNames.add('RIGHT META');
+      }
+      continue;
+    }
+
+    spec.key = mapAcceleratorKeyToListenerName(part);
+  }
+
+  if (!spec.key) {
+    return null;
+  }
+
+  spec.releaseNames.add(spec.key);
+  return spec;
+}
+
+function mapAcceleratorKeyToListenerName(key) {
+  const normalized = String(key || '').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const upper = normalized.toUpperCase();
+  const keyMap = {
+    '`': 'SECTION',
+    '~': 'SECTION',
+    'SPACE': 'SPACE',
+    'ESC': 'ESC',
+    'ESCAPE': 'ESC',
+    'UP': 'UP ARROW',
+    'DOWN': 'DOWN ARROW',
+    'LEFT': 'LEFT ARROW',
+    'RIGHT': 'RIGHT ARROW',
+    'ENTER': 'ENTER',
+    'RETURN': 'ENTER',
+    'TAB': 'TAB',
+    'BACKSPACE': 'BACKSPACE',
+    'DELETE': 'DELETE',
+    'PLUS': '=',
+    'MINUS': '-'
+  };
+
+  if (keyMap[upper]) {
+    return keyMap[upper];
+  }
+
+  if (/^F\d{1,2}$/.test(upper)) {
+    return upper;
+  }
+
+  if (/^[A-Z0-9]$/.test(upper)) {
+    return upper;
+  }
+
+  return upper;
+}
+
+function matchesVoiceHotkeyDown(event, down, spec) {
+  if (!event?.name || event.name !== spec.key) {
+    return false;
+  }
+
+  const ctrlDown = Boolean(down['LEFT CTRL'] || down['RIGHT CTRL']);
+  const shiftDown = Boolean(down['LEFT SHIFT'] || down['RIGHT SHIFT']);
+  const altDown = Boolean(down['LEFT ALT'] || down['RIGHT ALT']);
+  const metaDown = Boolean(down['LEFT META'] || down['RIGHT META']);
+
+  return ctrlDown === spec.ctrl
+    && shiftDown === spec.shift
+    && altDown === spec.alt
+    && metaDown === spec.meta;
+}
+
+function isVoiceHotkeyRelease(event, spec) {
+  return Boolean(event?.name && spec.releaseNames.has(event.name));
 }
 
 async function persistSpeechCapture(audioBytes, metadata = {}) {
@@ -1397,6 +1587,24 @@ function parseSceneCutCommand(transcript) {
   return `cut to ${target}`;
 }
 
+function parseSceneFadeCommand(transcript) {
+  if (/\bfade to black\b/.test(transcript)) {
+    return 'fade to black';
+  }
+
+  const match = transcript.match(/\bfade\b\s+(?:to\s+)?(.+)$/);
+  if (!match) {
+    return '';
+  }
+
+  const target = detectBareCameraSlot(match[1]) || resolveSceneCommandTarget(match[1]);
+  if (!target) {
+    return '';
+  }
+
+  return `fade to ${target}`;
+}
+
 function parseDirectSceneReference(transcript) {
   const knownScenes = Array.isArray(desktopObsState.scenes) ? desktopObsState.scenes : [];
   for (const sceneName of knownScenes) {
@@ -1580,6 +1788,21 @@ function parseDesktopIntent(transcript) {
     };
   }
 
+  const fadeSceneCommand = parseSceneFadeCommand(activeTranscript);
+  if (fadeSceneCommand) {
+    return {
+      transcript: activeTranscript,
+      command: fadeSceneCommand,
+      intent: fadeSceneCommand === 'fade to black' ? 'fade_to_black' : 'fade_scene',
+      appliedCorrections: correctionResult.appliedCorrections,
+      safetyDecision: 'safe_scene_fade'
+    };
+  }
+
+  if (hasStandaloneWord(activeTranscript, 'fade')) {
+    return { transcript: activeTranscript, command: 'fade', intent: 'studio_fade', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_fade' };
+  }
+
   if (hasStandaloneWord(activeTranscript, 'cut')) {
     return { transcript: activeTranscript, command: 'cut', intent: 'studio_cut', appliedCorrections: correctionResult.appliedCorrections, safetyDecision: 'safe_cut' };
   }
@@ -1740,7 +1963,33 @@ function findBestSceneMatch(scenes, targetScene) {
 
 async function findDesktopInput(target) {
   const { inputs } = await desktopObs.call('GetInputList');
-  return inputs.find((input) => input.inputName.toLowerCase().includes(target.toLowerCase()));
+  const normalizedTarget = String(target || '').toLowerCase();
+
+  const exactName = inputs.find((input) => input.inputName.toLowerCase() === normalizedTarget);
+  if (exactName) {
+    return exactName;
+  }
+
+  if (normalizedTarget === 'mic') {
+    const micPatterns = [/mic/i, /microphone/i, /aux/i];
+    const preferred = inputs.find((input) => micPatterns.some((pattern) => pattern.test(input.inputName)));
+    if (preferred) {
+      return preferred;
+    }
+  }
+
+  if (normalizedTarget === 'desktop') {
+    const desktopPatterns = [/desktop/i, /speaker/i, /game/i, /audio/i];
+    const preferred = inputs.find((input) => {
+      const name = input.inputName || '';
+      return desktopPatterns.some((pattern) => pattern.test(name)) && !/mic|microphone|aux/i.test(name);
+    });
+    if (preferred) {
+      return preferred;
+    }
+  }
+
+  return inputs.find((input) => input.inputName.toLowerCase().includes(normalizedTarget));
 }
 
 async function desktopSwitchToScene(targetScene) {
@@ -1840,11 +2089,9 @@ async function desktopSetVolume(target, percent) {
   }
 
   const normalizedPercent = Math.max(0, Math.min(100, Number(percent)));
-  const volumeDb = normalizedPercent === 0 ? -100 : (normalizedPercent / 100 * 100) - 100;
-
   await desktopObs.call('SetInputVolume', {
     inputName: input.inputName,
-    inputVolumeDb: volumeDb
+    inputVolumeMul: normalizedPercent / 100
   });
 
   return {
@@ -1868,11 +2115,9 @@ async function desktopAdjustVolume(target, deltaPercent) {
   });
   const currentPercent = Math.round(Math.max(0, Math.min(1, Number(volumeState.inputVolumeMul ?? 0))) * 100);
   const nextPercent = Math.max(0, Math.min(100, currentPercent + Number(deltaPercent)));
-  const volumeDb = nextPercent === 0 ? -100 : (nextPercent / 100 * 100) - 100;
-
   await desktopObs.call('SetInputVolume', {
     inputName: input.inputName,
-    inputVolumeDb: volumeDb
+    inputVolumeMul: nextPercent / 100
   });
 
   return {
@@ -1937,6 +2182,30 @@ async function desktopCutTransition() {
   return { success: true, message: 'Cut to program' };
 }
 
+async function desktopFadeTransition() {
+  if (!desktopObsState.connected) {
+    throw new Error('OBS not connected');
+  }
+
+  const studioMode = await desktopObs.call('GetStudioModeEnabled').catch(() => ({ studioModeEnabled: false }));
+  if (!studioMode?.studioModeEnabled) {
+    return { success: false, message: 'Studio Mode is not enabled in OBS' };
+  }
+
+  try {
+    await desktopObs.call('SetCurrentSceneTransition', { transitionName: 'Fade' });
+  } catch (_error) {
+    // If explicit fade selection is unavailable, keep the current transition.
+  }
+
+  await desktopObs.call('TriggerStudioModeTransition');
+  return { success: true, message: 'Fade to program' };
+}
+
+async function desktopFadeToBlack() {
+  return desktopFadeToScene('brb');
+}
+
 async function desktopCutToScene(targetScene) {
   const switchResult = await desktopSwitchToScene(targetScene);
   if (!switchResult?.success) {
@@ -1947,6 +2216,24 @@ async function desktopCutToScene(targetScene) {
   return {
     success: true,
     message: `Cut to ${targetLabel}`
+  };
+}
+
+async function desktopFadeToScene(targetScene) {
+  const previewResult = await desktopPreviewScene(targetScene);
+  if (!previewResult?.success) {
+    return previewResult;
+  }
+
+  const fadeResult = await desktopFadeTransition();
+  if (!fadeResult?.success) {
+    return fadeResult;
+  }
+
+  const targetLabel = previewResult.message?.replace(/^Previewing\s+/, '') || targetScene;
+  return {
+    success: true,
+    message: `Fade to ${targetLabel}`
   };
 }
 
@@ -1976,6 +2263,10 @@ async function executeDesktopCommand(command) {
     result = await desktopPreviewScene(normalized.replace(/^preview\s+/, ''));
   } else if (normalized.startsWith('cut to ')) {
     result = await desktopCutToScene(normalized.replace(/^cut to\s+/, ''));
+  } else if (normalized === 'fade to black') {
+    result = await desktopFadeToBlack();
+  } else if (normalized.startsWith('fade to ')) {
+    result = await desktopFadeToScene(normalized.replace(/^fade to\s+/, ''));
   } else if (micVolumeMatch) {
     result = await desktopSetVolume('mic', micVolumeMatch[1]);
   } else if (desktopVolumeMatch) {
@@ -2004,6 +2295,8 @@ async function executeDesktopCommand(command) {
     result = await desktopTakeScreenshot();
   } else if (normalized === 'cut') {
     result = await desktopCutTransition();
+  } else if (normalized === 'fade') {
+    result = await desktopFadeTransition();
   } else if (normalized === 'emergency mute') {
     await desktopSetMute('mic', true);
     try {
@@ -2261,6 +2554,14 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   globalShortcut.unregisterAll();
+  if (globalKeyboardListener) {
+    if (globalKeyboardListenerHandler) {
+      globalKeyboardListener.removeListener(globalKeyboardListenerHandler);
+      globalKeyboardListenerHandler = null;
+    }
+    globalKeyboardListener.kill();
+    globalKeyboardListener = null;
+  }
   // Kill the server process
   if (serverProcess) {
     serverProcess.kill();

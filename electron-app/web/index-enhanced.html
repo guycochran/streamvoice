@@ -294,26 +294,47 @@
                 <h3>Quick Actions</h3>
                 <p style="color: #666; margin-bottom: 20px;">One-click production actions for streamers, presenters, and live operators.</p>
                 <div class="macro-buttons">
+                    <button class="macro-button" onclick="executeCommand('start stream')">
+                        🔴 Start Stream
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('stop stream')">
+                        ⏹️ Stop Stream
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('mute mic')">
+                        🔇 Mute Mic
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('unmute mic')">
+                        🔊 Unmute Mic
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('switch to break')">
+                        ⏸️ Break
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('switch to camera 1')">
+                        🎥 Camera 1
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('take screenshot')">
+                        📸 Screenshot
+                    </button>
                     <button class="macro-button" onclick="executeCommand('stream starting setup')">
                         🚀 Start Session
                     </button>
                     <button class="macro-button" onclick="executeCommand('stream ending setup')">
                         🛑 End Session
                     </button>
-                    <button class="macro-button" onclick="executeCommand('switch to break')">
-                        ⏸️ Switch to Break
-                    </button>
-                    <button class="macro-button" onclick="executeCommand('switch to camera 1')">
-                        🎥 Camera 1
-                    </button>
                     <button class="macro-button" onclick="executeCommand('cut')" data-studio-only style="display: none;">
                         ✂️ Cut
                     </button>
+                    <button class="macro-button" onclick="executeCommand('fade')" data-studio-only style="display: none;">
+                        🌗 Fade
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('fade to black')" data-studio-only style="display: none;">
+                        ⚫ Fade to Black
+                    </button>
+                    <button class="macro-button" onclick="executeCommand('preview camera 1')" data-studio-only style="display: none;">
+                        👁️ Preview Cam 1
+                    </button>
                     <button class="macro-button" onclick="executeCommand('emergency mute')">
                         🚨 Emergency Mute
-                    </button>
-                    <button class="macro-button" onclick="executeCommand('take screenshot')">
-                        📸 Screenshot
                     </button>
                 </div>
             </div>
@@ -536,11 +557,11 @@
                     <h4>Voice Hotkey</h4>
                     <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px;">
                         <div style="margin-bottom: 15px;">
-                            <label for="voice-hotkey" style="display: block; margin-bottom: 5px; color: #9b59b6;">Global Voice Hotkey (toggle):</label>
+                            <label for="voice-hotkey" style="display: block; margin-bottom: 5px; color: #9b59b6;">Global Voice Hotkey:</label>
                             <input type="text" id="voice-hotkey" placeholder="Ctrl+Shift+V" style="width: 100%; padding: 8px; background: #f5f7fb; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: #111827;">
                         </div>
                         <div id="voice-hotkey-status" style="font-size: 13px; color: #b9c0d0; margin-bottom: 15px;">
-                            Click the field and press your shortcut. Press once to start listening, press again to transcribe.
+                            Click the field and press your shortcut. StreamVoice will use hold-to-talk when the global key listener is available, and fall back to toggle behavior otherwise.
                         </div>
                         <div style="display: flex; gap: 10px;">
                             <button class="macro-button" onclick="saveAppPreferences()" style="background: #8e44ad; padding: 10px 20px;">
