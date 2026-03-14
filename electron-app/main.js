@@ -262,7 +262,7 @@ function createTray() {
         dialog.showMessageBox({
           type: 'info',
           title: 'About StreamVoice',
-          message: 'StreamVoice v1.1.0-beta.18',
+          message: 'StreamVoice v1.1.0-beta.19',
           detail: 'Professional voice control for OBS Studio.\n\nMade with ❤️ for streamers.',
           buttons: ['OK']
         });
@@ -1239,6 +1239,15 @@ function detectCameraSlotFromWords(transcript) {
   return '';
 }
 
+function detectBareCameraSlot(value) {
+  const normalized = normalizeSceneTargetWords(value);
+  if (['1', 'one', 'won'].includes(normalized)) return 'camera 1';
+  if (['2', 'two', 'too'].includes(normalized)) return 'camera 2';
+  if (['3', 'three', 'tree'].includes(normalized)) return 'camera 3';
+  if (['4', 'four', 'fore'].includes(normalized)) return 'camera 4';
+  return '';
+}
+
 function isSingleWordTranscript(transcript) {
   return compactWords(transcript).split(/\s+/).filter(Boolean).length === 1;
 }
@@ -1366,7 +1375,7 @@ function parseScenePreviewCommand(transcript) {
     return '';
   }
 
-  const target = resolveSceneCommandTarget(match[1]);
+  const target = detectBareCameraSlot(match[1]) || resolveSceneCommandTarget(match[1]);
   if (!target) {
     return '';
   }
@@ -1380,7 +1389,7 @@ function parseSceneCutCommand(transcript) {
     return '';
   }
 
-  const target = resolveSceneCommandTarget(match[1]);
+  const target = detectBareCameraSlot(match[1]) || resolveSceneCommandTarget(match[1]);
   if (!target) {
     return '';
   }
